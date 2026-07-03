@@ -1,0 +1,211 @@
+const inputText = `#运动偏好
+-跑步 | 🏃‍♂️
+-游泳 | 🏊
+-打篮球 | 🏀
+-骑行 | 🚴
+-力量训练
+-爬山
+
+#食物偏好
+-甜食 | 🍰
+-辣的 | 🌶️
+-海鲜 | 🦐
+-素食 | 🥦
+`;
+
+function parsePreferenceText(inputText) {
+	let lines = inputText.split('\n');
+	let result = [];
+	let currentCategory = null;
+
+	for (let line of lines) {
+		line = line.trim();
+		if (line === '') continue;
+
+		if (line.startsWith('#')) {
+			currentCategory = {
+				name: line.slice(1).trim(),
+				items: []
+			};
+			result.push(currentCategory);
+		} else if (line.startsWith('-')) {
+			if (!currentCategory) continue;
+
+			let content = line.slice(1).trim();
+			let [label, emoji] = content.split('|');
+			label = label.trim();
+			emoji = emoji ? emoji.trim() : '';
+
+			currentCategory.items.push({
+				label,
+				emoji,
+				rate: 0
+			});
+		}
+	}
+	return result;
+}
+
+const categories = parsePreferenceText(inputText);
+let currentPage = 0;
+
+let titleEl = document.getElementById('category-title');
+let listEl = document.getElementById('item-list');
+let prevBtn = document.getElementById('prev-btn');
+let nextBtn = document.getElementById('next-btn');
+let submitBtn = document.getElementById('submit-btn');
+
+function renderPage() {
+	if (!categories[currentPage]) return;
+	const category = categories[currentPage];
+	titleEl.textContent = category.name;
+	listEl.innerHTML = '';
+
+	category.items.forEach((item, index) => {
+		const div = document.createElement('div');
+		div.className = 'item';
+		div.dataset.rate = item.rate;
+		div.innerText = `${item.emoji} ${item.label}`;
+
+		div.onclick = () => {
+			item.rate = (item.rate + 1) % 5;
+			div.dataset.rate = item.rate;
+		};
+
+		listEl.appendChild(div);
+	});
+
+	prevBtn.style.visibility = currentPage === 0 ? 'hidden' : 'visible';
+	nextBtn.style.visibility = currentPage === categories.length - 1 ? 'hidden' : 'visible';
+	document.getElementById('submit-btn-container').style.display =
+		currentPage === categories.length - 1 ? 'block' : 'none';
+}
+
+prevBtn.onclick = () => {
+	currentPage--;
+	renderPage();
+};
+
+nextBtn.onclick = () => {
+	currentPage++;
+	renderPage();
+};
+
+renderPage();
+
+const controlBtnClickSound = new Audio('mp3/controlbtn.mp3');
+const buttonClickSound = new Audio('mp3/button.mp3');
+
+document.querySelector('#item-list').addEventListener('click', function(event) {
+	if (event.target.classList.contains('item') || 
+		event.target.id === 'prev-btn' || 
+		event.target.id === 'next-btn' || 
+		event.target.id === 'submit-btn') {
+
+		buttonClickSound.currentTime = 0;
+		buttonClickSound.play().catch(e => console.error("音效播放错误: ", e));
+
+		if (event.target.classList.contains('item')) {
+			event.target.classList.add('pop');
+			setTimeout(() => {
+				event.target.classList.remove('pop');
+			}, 200);
+		}
+	}
+});
+
+document.querySelector('#prev-btn').addEventListener('click', () => {
+	controlBtnClickSound.currentTime = 0;
+	controlBtnClickSound.play();
+});
+
+document.querySelector('#next-btn').addEventListener('click', () => {
+	controlBtnClickSound.currentTime = 0;
+	controlBtnClickSound.play();
+});
+
+document.querySelector('#submit-btn').addEventListener('click', () => {
+	controlBtnClickSound.currentTime = 0;
+	controlBtnClickSound.play();
+	showResult();
+});
+
+function showResult() {
+	const resultPage = document.querySelector('#result-page');
+	const mainPage = document.querySelector('#main-page');
+
+	mainPage.style.display = 'none';
+	resultPage.style.display = 'block';
+	resultPage.innerHTML = '';
+	
+	const shareContainer = document.createElement('div');
+	  shareContainer.style.margin = '20px 0';
+	  shareContainer.style.display = 'flex';
+	  shareContainer.style.justifyContent = 'center';
+	  shareContainer.style.gap = '10px';
+	
+	  // 创建分享按钮
+	  const shareBtn = document.createElement('button');
+	  shareBtn.innerHTML = '📷 保存结果图片';
+	  shareBtn.style.padding = '10px 20px';
+	  shareBtn.style.background = 'linear-gradient(135deg, #f8c8d0, #ec4d7a)';
+	  shareBtn.style.color = 'white';
+	  shareBtn.style.border = 'none';
+	  shareBtn.style.borderRadius = '20px';
+	  shareBtn.style.cursor = 'pointer';
+	
+	  // 点击生成图片
+	  shareBtn.addEventListener('click', () => {
+	    html2canvas(resultPage).then(canvas => {
+	      const link = document.createElement('a');
+	      link.download = '我的偏好测评结果.png';
+	      link.href = canvas.toDataURL('image/png');
+	      link.click();
+	    });
+	  });
+	
+	  // 其他原有代码...
+	  shareContainer.appendChild(shareBtn);
+	  resultPage.appendChild(shareContainer);
+	
+
+	const rateLabels = [
+		'不接受 🈲',
+		'无所谓 😐',
+		'有些兴趣 🙂',
+		'比较喜欢 😍',
+		'非常喜欢 ❤️'
+	];
+
+	const backBtn = document.createElement('button');
+	backBtn.textContent = '← 返回修改';
+	backBtn.style.marginBottom = '20px';
+	backBtn.style.padding = '8px 16px';
+	backBtn.style.borderRadius = '8px';
+	backBtn.style.cursor = 'pointer';
+	backBtn.style.border = 'none';
+	backBtn.style.backgroundColor = '#f8c8d0';
+	backBtn.style.fontWeight = 'bold';
+
+	backBtn.onclick = () => {
+		mainPage.style.display = 'block';
+		resultPage.style.display = 'none';
+	};
+
+	resultPage.appendChild(backBtn);
+
+	categories.forEach((category) => {
+		const title = document.createElement('h3');
+		title.textContent = `【${category.name}】`;
+		title.style.color = '#5a2a41';
+		resultPage.appendChild(title);
+
+		category.items.forEach((item) => {
+			const rate = item.rate || 0;
+			const line = document.createElement('p');
+			line.textContent = `${item.emoji ? item.emoji + ' ' : ''}${item.label}：${rateLabels[rate]}`;
+			line.style.margin = '6px 0';
+			resultPage.appendChild(line);
+		});
+	});
+}

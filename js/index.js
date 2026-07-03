@@ -1,0 +1,682 @@
+let inputText = `
+#训练方式偏好
+-自由重量训练 | 🏋️‍♂️
+-器械训练 | 🛠️
+-自重训练 | 🤸‍♂️
+-HIIT高强间歇 | ⏱️
+-长时间有氧 | 🏃‍♀️
+-健身团课 | 👯‍♂️
+-格斗类训练 | 🥊
+-舞蹈健身 | 💃
+-功能性训练 | ⚙️
+-体操类训练 | 🧗
+
+#饮食控制偏好
+-严格控制热量 | 📉
+-轻断食 | ⏳
+-碳循环 | 🔁
+-高蛋白饮食 | 🥩
+-低碳水饮食 | 🥑
+-增肌餐 | 🍚
+-水煮清淡 | 🍲
+-偶尔放纵 | 🍕
+-完全不控制 | 🤷‍♂️
+
+#训练节奏偏好
+-每天训练 | 📅
+-隔天训练 | 🔁
+-一周三练 | 🧘
+-随缘训练 | 🐢
+-追求计划感 | 📝
+-自由发挥型 | 🎲
+
+#锻炼部位偏好
+-胸部训练 | 💪
+-腿部训练 | 🦵
+-腹肌训练 | 🔥
+-背部训练 | 🐍
+-手臂训练 | 🏹
+-肩部训练 | 🕊️
+-全身综合 | 🧱
+
+#健身目标偏好
+-增肌 | 📈
+-减脂 | 🔥
+-塑形 | 🔄
+-增强体能 | ⚡
+-提升姿态气质 | 👑
+-为了健康 | ❤️
+-为了颜值 | 😎
+
+#恢复方式偏好
+-按摩放松 | 💆‍♂️
+-拉伸热身 | 🧘‍♂️
+-泡澡桑拿 | ♨️
+-睡觉休息 | 🛌
+-吃补剂恢复 | 💊
+-冥想呼吸 | 🧘‍♀️
+
+#健身场景偏好
+-健身房 | 🏢
+-家里锻炼 | 🏠
+-户外锻炼 | 🌳
+-宿舍偷偷练 | 🫣
+-办公室活动 | 💼
+-操场公园 | 🛝
+
+#健身态度偏好
+-打卡型选手 | 📸
+-闭门修炼 | 🧙‍♂️
+-社交健身型 | 🧑‍🤝‍🧑
+-分享型博主 | 📱
+-追求极限 | 🧬
+-佛系健身 | 🐼
+
+`;
+
+
+const API_BASE_URL = 'https://kinkform-api.lpswz0001.workers.dev'; // 部署后请改为您的 Worker 域名，如 https://kinkform-api.YOUR-NAME.workers.dev
+
+let userName = '';
+let isNameSubmitted = false;
+let currentText = inputText;
+const controlBtnClickSound = new Audio('mp3/controlbtn.mp3');
+const buttonClickSound = new Audio('mp3/button.mp3');
+
+
+//  初始化
+
+
+
+
+
+
+
+
+function start() {
+	if (!isNameSubmitted) {
+	  renderNameInput();
+	} else {
+	  initApp();
+	}
+}
+
+
+function renderNameInput() {
+  document.getElementById('home-page').style.display = 'none';
+  document.getElementById('app').style.display = 'block';
+  const app = document.getElementById('app');
+  app.innerHTML = `
+    <div class="name-card">
+      <h2>请填写测评人昵称</h2>
+      <input type="text" id="name-input" placeholder="输入昵称(不超过10个字)" maxlength="10">
+      <button id="start-btn">开始测评</button>
+    </div>
+  `;
+
+  document.getElementById('start-btn').addEventListener('click', () => {
+    const nameInput = document.getElementById('name-input').value.trim();
+    if (nameInput) {
+      userName = nameInput;
+      isNameSubmitted = true;
+      initApp(); // 初始化主应用
+      controlBtnClickSound.play();
+    } else {
+      alert('请输入昵称哦~');
+    }
+  });
+}
+
+
+
+function initApp() {
+if(categories.length === 0) {
+	categories = parsePreferenceText(currentText);
+  }
+  const app = document.getElementById('app');
+  app.innerHTML = `
+    <div id="main-page">
+      <h2 id="category-title"></h2>
+      <div id="item-list" class="item-list"></div>
+      <div class="nav-buttons">
+        <button id="prev-btn">← 上一页</button>
+        <button id="next-btn">下一页 →</button>
+      </div>
+      <div id="submit-btn-container" style="display: none;">
+        <button id="submit-btn">提交</button>
+      </div>
+    </div>
+    <div id="result-page" style="display: none;"></div>
+  `;
+
+  // 重新获取所有DOM引用
+  titleEl = document.getElementById('category-title');
+  listEl = document.getElementById('item-list');
+  prevBtn = document.getElementById('prev-btn');
+  nextBtn = document.getElementById('next-btn');
+  submitBtn = document.getElementById('submit-btn');
+
+  // 重新绑定事件处理程序
+  prevBtn.onclick = () => {
+    currentPage--;
+    renderPage();
+    controlBtnClickSound.play();
+  };
+
+  nextBtn.onclick = () => {
+    currentPage++;
+    renderPage();
+    controlBtnClickSound.play();
+  };
+
+  submitBtn.onclick = () => {
+    controlBtnClickSound.play();
+    showResult();
+  };
+
+  // 初始化页面
+  currentPage = 0; // 重置当前页面
+  renderPage();
+}
+
+
+// 脚本解析成表结构
+function parsePreferenceText(inputText) {
+	let lines = inputText.split('\n');
+	let result = [];
+	let currentCategory = null;
+
+	for (let line of lines) {
+		line = line.trim();
+		if (line === '') continue;
+
+		if (line.startsWith('#')) {
+			currentCategory = {
+				name: line.slice(1).trim(),
+				items: []
+			};
+			result.push(currentCategory);
+		} else if (line.startsWith('-')) {
+			if (!currentCategory) continue;
+
+			let content = line.slice(1).trim();
+			let [label, emoji] = content.split('|');
+			label = label.trim();
+			emoji = emoji ? emoji.trim() : '';
+
+			currentCategory.items.push({
+				label,
+				emoji,
+				rate: 0
+			});
+		}
+	}
+	return result;
+}
+
+
+let currentPage = 0;
+let categories = [];
+let titleEl = document.getElementById('category-title');
+let listEl = document.getElementById('item-list');
+let prevBtn = document.getElementById('prev-btn');
+let nextBtn = document.getElementById('next-btn');
+let submitBtn = document.getElementById('submit-btn');
+
+
+
+function renderPage() {
+  if (!categories[currentPage]) return;
+  const category = categories[currentPage];
+  titleEl.innerHTML = `
+      ${category.name}
+      <div class="operation-hint">
+        ← 点击左侧减分 | 点击右侧加分 →
+      </div>
+    `;
+  listEl.innerHTML = '';
+
+  category.items.forEach((item) => {
+    const itemEl = document.createElement('div');
+    itemEl.className = 'item-split';
+    itemEl.dataset.rate = item.rate;
+    
+    // 简化后的分区（去掉爱心显示）
+    itemEl.innerHTML = `
+      <div class="left-half">${item.emoji} ${item.label}</div>
+      <div class="right-half">${getRateText(item.rate)}</div>
+    `;
+
+    // 左半区点击减分
+    itemEl.querySelector('.left-half').addEventListener('click', (e) => {
+      e.stopPropagation();
+      item.rate = Math.max(0, item.rate - 1);
+      updateItemState(itemEl, item);
+      playClickEffect();
+    });
+
+    // 右半区点击加分
+    itemEl.querySelector('.right-half').addEventListener('click', (e) => {
+      e.stopPropagation();
+      item.rate = Math.min(4, item.rate + 1);
+      updateItemState(itemEl, item);
+      playClickEffect();
+    });
+
+    listEl.appendChild(itemEl);
+  });
+
+  // 更新导航按钮状态
+  prevBtn.style.visibility = currentPage === 0 ? 'hidden' : 'visible';
+  nextBtn.style.visibility = currentPage === categories.length - 1 ? 'hidden' : 'visible';
+  document.getElementById('submit-btn-container').style.display =
+    currentPage === categories.length - 1 ? 'block' : 'none';
+}
+
+// 简化后的评分显示（纯文字）
+function getRateText(rate) {
+  const texts = ['不接受', '无所谓', '一般', '喜欢', '超爱'];
+  return texts[rate];
+}
+
+// 更新元素状态
+function updateItemState(el, item) {
+  el.dataset.rate = item.rate;
+  el.querySelector('.right-half').textContent = getRateText(item.rate);
+  
+  // 添加动画效果
+  el.classList.add('pop');
+  setTimeout(() => el.classList.remove('pop'), 200);
+}
+
+function playClickEffect() {
+  buttonClickSound.currentTime = 0;
+  buttonClickSound.play().catch(e => console.error("音效播放错误: ", e));
+}
+
+
+
+document.addEventListener('click', function(event) {
+  if (event.target.closest('.item-split')) {
+    buttonClickSound.currentTime = 0;
+    buttonClickSound.play().catch(e => console.error("音效播放错误: ", e));
+    event.target.closest('.item-split').classList.add('pop');
+    setTimeout(() => {
+      event.target.closest('.item-split').classList.remove('pop');
+    }, 200);
+  }
+});
+
+
+
+
+function showResult() {
+	const resultPage = document.querySelector('#result-page');
+	const mainPage = document.querySelector('#main-page');
+
+	mainPage.style.display = 'none';
+	resultPage.style.display = 'block';
+	resultPage.innerHTML = `
+	    <div class="user-header">
+	      <h2>${userName}的偏好自测</h2>
+	    </div>
+	  `;
+	
+	
+	
+
+	const rateLabels = [
+		'不接受 🈲',
+		'无所谓 😐',
+		'一般 🙂',
+		'喜欢 😍',
+		'超爱 🥰'
+	];
+
+	const backBtn = document.createElement('button');
+	backBtn.textContent = '← 返回修改';
+	backBtn.style.position = 'absolute';  // 新增
+	backBtn.style.left = '0';             // 新增
+	backBtn.style.top = '0';              // 新增
+	backBtn.style.margin = '10px';        // 修改
+	backBtn.style.padding = '10px 12px';   // 调整
+	backBtn.style.borderRadius = '8px';
+	backBtn.style.cursor = 'pointer';
+	backBtn.style.border = 'none';
+	backBtn.style.backgroundColor = '#f8c8d0';
+	backBtn.style.fontWeight = 'bold';
+	backBtn.style.zIndex = '1';  
+
+	backBtn.onclick = () => {
+		mainPage.style.display = 'block';
+		resultPage.style.display = 'none';
+		controlBtnClickSound.currentTime = 0;
+		controlBtnClickSound.play();
+	};
+
+	resultPage.appendChild(backBtn);
+
+	categories.forEach((category) => {
+		const title = document.createElement('h3');
+		title.textContent = `【${category.name}】`;
+		title.style.color = '#5a2a41';
+		resultPage.appendChild(title);
+
+		category.items.forEach((item) => {
+			const rate = item.rate || 0;
+			const line = document.createElement('p');
+			line.textContent = `${item.emoji ? item.emoji + ' ' : ''}${item.label}：${rateLabels[rate]}`;
+			line.style.margin = '6px 0';
+			resultPage.appendChild(line);
+		});
+	});
+	
+	const shareContainer = document.createElement('div');
+	  shareContainer.style.margin = '20px 0';
+	  shareContainer.style.display = 'flex';
+	  shareContainer.style.justifyContent = 'center';
+	  shareContainer.style.gap = '10px';
+	
+	  // 创建分享按钮
+	  const shareBtn = document.createElement('button');
+	  shareBtn.innerHTML = '📷 保存结果图片';
+	  shareBtn.style.padding = '10px 20px';
+	  shareBtn.style.background = 'linear-gradient(135deg, #f8c8d0, #ec4d7a)';
+	  shareBtn.style.color = 'white';
+	  shareBtn.style.border = 'none';
+	  shareBtn.style.borderRadius = '20px';
+	  shareBtn.style.cursor = 'pointer';
+	
+	  shareBtn.addEventListener('click', async () => {
+	    try {
+	      // 1. 隐藏所有按钮
+	      const buttons = [...resultPage.querySelectorAll('button')];
+	      buttons.forEach(btn => btn.style.visibility = 'hidden');
+	      
+	      // 2. 添加水印元素
+	      const watermark = document.createElement('div');
+	      watermark.innerHTML = 'KinkForm · 李咸鱼';
+	      watermark.style.position = 'absolute';
+	      watermark.style.bottom = '10px';
+	      watermark.style.right = '10px';
+	      watermark.style.fontSize = '12px';
+	      watermark.style.color = 'rgba(0,0,0,0.2)';
+	      watermark.style.fontFamily = 'sans-serif';
+	      watermark.style.zIndex = '9999';
+	      resultPage.appendChild(watermark);
+	      
+	      // 3. 添加加载提示
+	      const loading = document.createElement('div');
+	      loading.textContent = '正在生成图片...';
+	      loading.style.position = 'fixed';
+	      loading.style.top = '50%';
+	      loading.style.left = '50%';
+	      loading.style.transform = 'translate(-50%, -50%)';
+	      loading.style.background = 'rgba(0,0,0,0.7)';
+	      loading.style.color = 'white';
+	      loading.style.padding = '10px 20px';
+	      loading.style.borderRadius = '5px';
+	      loading.style.zIndex = '1000';
+	      document.body.appendChild(loading);
+	      
+	      // 4. 生成图片
+	      const canvas = await html2canvas(resultPage, {
+	        backgroundColor: '#fff5f7', // 使用你的主题色
+	        scale: 2 // 提高生成质量
+	      });
+	      
+	      // 5. 清理元素
+	      resultPage.removeChild(watermark);
+	      document.body.removeChild(loading);
+	      buttons.forEach(btn => btn.style.visibility = '');
+	      
+	      // 6. 下载图片
+	      const link = document.createElement('a');
+	      link.download = `${userName}的KinkForm测评结果.png`;
+	      link.href = canvas.toDataURL('image/png', 1.0);
+	      link.click();
+	      
+	    } catch (error) {
+	      console.error('生成图片失败:', error);
+	      alert('图片生成失败，请重试');
+	    }
+	  });
+	
+	  // 其他原有代码...
+	  shareContainer.appendChild(shareBtn);
+	  resultPage.appendChild(shareContainer);
+	
+}
+
+
+
+function initHomePage() {
+  document.getElementById('default-btn').onclick = () => {
+    start();
+  };
+
+  document.getElementById('custom-btn').onclick = () => {
+    document.getElementById('custom-modal').style.display = 'flex';
+    document.getElementById('share-link-container').style.display = 'none';
+  };
+
+  document.getElementById('help-btn').onclick = () => {
+    // alert("使用说明：\n...");
+  };
+
+  document.getElementById('generate-share-btn').onclick = async function() {
+    // 检查本地冷却时间
+    const lastGenTime = localStorage.getItem('kinkform_last_gen_time');
+    if (lastGenTime && Date.now() - parseInt(lastGenTime) < 60000) {
+      alert('生成过快！为了防滥用，请等待1分钟后再试。');
+      return;
+    }
+
+    const customText = document.querySelector('#custom-textarea').value.trim();
+    if (!customText) {
+      alert('请先粘贴有效的自测表脚本！');
+      return;
+    }
+    
+    document.getElementById('loading-overlay').style.display = 'flex';
+    document.getElementById('loading-text').textContent = '正在生成分享链接...';
+    
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/share`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text: customText })
+      });
+      
+      if (!response.ok) {
+          const res = await response.json();
+          throw new Error(res.error || '网络请求失败');
+      }
+      
+      const data = await response.json();
+      const shareUrl = `${window.location.origin}${window.location.pathname}?key=${data.key}`;
+      
+      document.getElementById('share-link-container').style.display = 'block';
+      const linkInput = document.getElementById('share-link-input');
+      linkInput.value = shareUrl;
+      
+      // 自动复制
+      linkInput.select();
+      document.execCommand('copy');
+      alert('分享链接已生成并复制到剪贴板！');
+      
+      // 记录本地时间，限制60s
+      localStorage.setItem('kinkform_last_gen_time', Date.now().toString());
+
+      // 保存到本地分享记录
+      const shares = JSON.parse(localStorage.getItem('kinkform_shares') || '[]');
+      const titleLine = customText.split('\n').find(l => l.startsWith('#'));
+      shares.push({
+        key: data.key,
+        text: customText,
+        title: titleLine || '未命名表单',
+        timestamp: Date.now()
+      });
+      localStorage.setItem('kinkform_shares', JSON.stringify(shares));
+
+    } catch (error) {
+      console.error('生成分享链接失败:', error);
+      alert('失败: ' + error.message);
+    } finally {
+      document.getElementById('loading-overlay').style.display = 'none';
+    }
+  };
+
+  document.getElementById('share-link-input').onclick = (e) => {
+    e.target.select();
+    document.execCommand('copy');
+    alert('链接已复制！');
+  };
+
+  document.getElementById('confirm-btn').onclick = () => {
+    const customText = document.querySelector('#custom-textarea').value.trim();
+    if (customText) {
+      currentText = customText;
+      document.getElementById('custom-modal').style.display = 'none';
+      start();
+    } else {
+      alert('请输入有效的自测表内容！');
+    }
+  };
+
+  document.getElementById('cancel-btn').onclick = () => {
+    document.getElementById('custom-modal').style.display = 'none';
+    document.getElementById('share-link-container').style.display = 'none';
+  };
+
+  document.getElementById('my-shares-btn').onclick = () => {
+    renderShares();
+    document.getElementById('my-shares-modal').style.display = 'flex';
+  };
+
+  document.getElementById('close-shares-btn').onclick = () => {
+    document.getElementById('my-shares-modal').style.display = 'none';
+  };
+}
+
+function renderShares() {
+  const shares = JSON.parse(localStorage.getItem('kinkform_shares') || '[]');
+  const listEl = document.getElementById('shares-list');
+  if (shares.length === 0) {
+    listEl.innerHTML = '<p style="text-align:center; color:#999;">暂无分享记录</p>';
+    return;
+  }
+  
+  listEl.innerHTML = '';
+  // 按时间倒序
+  shares.sort((a,b) => b.timestamp - a.timestamp).forEach((share, index) => {
+    const item = document.createElement('div');
+    item.className = 'share-item';
+    const now = Date.now();
+    const expireTime = share.timestamp + 86400 * 1000;
+    const isExpired = now > expireTime;
+    
+    let statusHtml = '';
+    let actionsHtml = '';
+    
+    if (isExpired) {
+      statusHtml = '<span style="color:red;">(已过期)</span>';
+      actionsHtml = `<button onclick="extendShare(${index})" style="background:#f39c12;color:white;">续期一天</button>`;
+    } else {
+      const hoursLeft = Math.floor((expireTime - now) / 3600000);
+      statusHtml = `<span style="color:green;">(约${hoursLeft}小时后过期)</span>`;
+      actionsHtml = `<button onclick="copyShare('${share.key}')" style="background:#1abc9c;color:white;">复制链接</button>`;
+    }
+    
+    item.innerHTML = `
+      <h4>${share.title.replace('#','')}</h4>
+      <p>短链接Key: <b>${share.key}</b> ${statusHtml}</p>
+      <p style="font-size:12px;">生成时间: ${new Date(share.timestamp).toLocaleString()}</p>
+      <div class="actions">
+        ${actionsHtml}
+        <button onclick="deleteShare(${index})" style="background:#ccc;">删除记录</button>
+      </div>
+    `;
+    listEl.appendChild(item);
+  });
+}
+
+window.copyShare = (key) => {
+  const url = `${window.location.origin}${window.location.pathname}?key=${key}`;
+  if (navigator.clipboard && window.isSecureContext) {
+    navigator.clipboard.writeText(url).then(() => alert('链接已复制！'));
+  } else {
+    prompt('请长按或手动复制链接:', url);
+  }
+};
+
+window.deleteShare = (index) => {
+  if(confirm('确定删除本地记录吗？')) {
+    const shares = JSON.parse(localStorage.getItem('kinkform_shares') || '[]');
+    shares.sort((a,b) => b.timestamp - a.timestamp);
+    shares.splice(index, 1);
+    localStorage.setItem('kinkform_shares', JSON.stringify(shares));
+    renderShares();
+  }
+};
+
+window.extendShare = async (index) => {
+  const shares = JSON.parse(localStorage.getItem('kinkform_shares') || '[]');
+  shares.sort((a,b) => b.timestamp - a.timestamp);
+  const share = shares[index];
+  
+  document.getElementById('loading-overlay').style.display = 'flex';
+  document.getElementById('loading-text').textContent = '正在为您续期...';
+  
+  try {
+    const response = await fetch(`${API_BASE_URL}/api/share`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ text: share.text, key: share.key })
+    });
+    if (!response.ok) {
+        const res = await response.json();
+        throw new Error(res.error || '网络请求失败');
+    }
+    
+    share.timestamp = Date.now();
+    localStorage.setItem('kinkform_shares', JSON.stringify(shares));
+    alert('续期成功，链接已恢复激活！');
+    renderShares();
+  } catch(e) {
+    alert('续期失败: ' + e.message);
+  } finally {
+    document.getElementById('loading-overlay').style.display = 'none';
+  }
+};
+
+async function checkUrlParams() {
+  const urlParams = new URLSearchParams(window.location.search);
+  const key = urlParams.get('key');
+  
+  if (key) {
+    document.getElementById('loading-overlay').style.display = 'flex';
+    document.getElementById('loading-text').textContent = '正在载入分享的自测表...';
+    
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/share/${key}`);
+      if (response.ok) {
+        const text = await response.text();
+        currentText = text;
+        start(); // 直接进入测评流程
+      } else {
+        alert('加载分享的自测表失败：可能是链接已失效或密钥错误。');
+      }
+    } catch (error) {
+      console.error('加载分享配置失败:', error);
+      alert('网络错误，无法加载分享的自测表。');
+    } finally {
+      document.getElementById('loading-overlay').style.display = 'none';
+      // 移除 URL 中的 key 参数避免刷新重复加载
+      window.history.replaceState({}, document.title, window.location.pathname);
+    }
+  }
+}
+
+initHomePage();
+checkUrlParams();

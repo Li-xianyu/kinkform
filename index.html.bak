@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+	<meta charset="UTF-8">
+	<title>KinkForm</title>
+	<link rel="stylesheet" href="css/index.css">
+</head>
+<body>
+	<div id="app">
+		<div id="main-page">
+			<h2 id="category-title"></h2>
+			<div id="item-list" class="item-list"></div>
+			<div class="controls">
+				<button id="prev-btn">← 上一页</button>
+				<button id="next-btn">下一页 →</button>
+			</div>
+			<div id="submit-btn-container" style="display: none;">
+				<button id="submit-btn">提交</button>
+			</div>
+		</div>
+	
+		<div id="result-page" style="display: none;"></div>
+	</div>
+
+
+
+	<script src="js/index.js"></script>
+	<script src="https://html2canvas.hertzen.com/dist/html2canvas.min.js"></script>
+</body>
+</html>

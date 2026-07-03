@@ -1,0 +1,7 @@
+name = "kinkform-api"
+main = "index.js"
+compatibility_date = "2024-05-12"
+
+[[kv_namespaces]]
+binding = "KINKFORM_KV"
+id = "ce8003183cd944c9b08e0d54241cc0c6"
