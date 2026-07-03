@@ -7,47 +7,134 @@
 	<link rel="stylesheet" href="css/index.css">
 </head>
 <body>
+	<!-- 背景装饰光晕 -->
+	<div class="bg-blob blob-1"></div>
+	<div class="bg-blob blob-2"></div>
+
 	<div id="home-page">
-	  <h1 class="app-title">KinkForm</h1>
-	  <div class="menu-buttons">
-	    <button id="default-btn">默认自测表</button>
-	    <button id="custom-btn">载入自定义表</button>
-        <button id="my-shares-btn" style="background: linear-gradient(135deg, #1abc9c, #16a085);">我的分享记录</button>
-	    <button id="help-btn">帮助须知</button>
+	  <div class="galaxy-container">
+	    <!-- 背景旋转轨道 -->
+	    <svg class="orbit-bg" viewBox="0 0 400 400">
+	      <circle cx="200" cy="200" r="130" class="orbit-line line-1" />
+	      <circle cx="200" cy="200" r="80" class="orbit-line line-2" />
+	    </svg>
+
+	    <!-- 核心 Logo -->
+	    <div class="central-core" id="core-btn" style="cursor: pointer;">
+	      <div class="core-inner">
+	        <span class="core-logo">Kink</span>
+	        <span class="core-sub">Form</span>
+	      </div>
+	      <div class="core-pulse"></div>
+	    </div>
+
+	    <!-- 漂浮功能节点包装器与漂浮层 -->
+	    <div class="node-wrapper" id="wrapper-default" style="--rot: 0deg;">
+	      <div class="node-float node-default-float">
+	        <button id="default-btn" class="galaxy-node node-default" style="--rot: 0deg;">
+	          <svg class="node-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><line x1="10" y1="9" x2="8" y2="9"/></svg>
+	          <span class="node-text">默认自测</span>
+	        </button>
+	      </div>
+	    </div>
+	    
+	    <div class="node-wrapper" id="wrapper-custom" style="--rot: 0deg;">
+	      <div class="node-float node-custom-float">
+	        <button id="custom-btn" class="galaxy-node node-custom" style="--rot: 0deg;">
+	          <svg class="node-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/><polyline points="14 2 14 8 20 8"/><line x1="12" y1="18" x2="12" y2="12"/><line x1="9" y1="15" x2="15" y2="15"/></svg>
+	          <span class="node-text">载入自定义</span>
+	        </button>
+	      </div>
+	    </div>
+	    
+	    <div class="node-wrapper" id="wrapper-shares" style="--rot: 0deg;">
+	      <div class="node-float node-shares-float">
+	        <button id="my-shares-btn" class="galaxy-node node-shares" style="--rot: 0deg;">
+	          <svg class="node-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><polyline points="3 3 3 8 8 8"/><line x1="12" y1="7" x2="12" y2="12"/><line x1="12" y1="12" x2="16" y2="14"/></svg>
+	          <span class="node-text">分享记录</span>
+	        </button>
+	      </div>
+	    </div>
+	    
+	    <div class="node-wrapper" id="wrapper-help" style="--rot: 0deg;">
+	      <div class="node-float node-help-float">
+	        <button id="help-btn" class="galaxy-node node-help" style="--rot: 0deg;">
+	          <svg class="node-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+	          <span class="node-text">帮助须知</span>
+	        </button>
+	      </div>
+	    </div>
 	  </div>
 	  
 	  <!-- 自定义表输入弹窗 -->
-	  <div id="custom-modal" style="display: none;">
-	    <div class="modal-content">
-	      <h3>粘贴你的自测表脚本</h3>
-	      <textarea id="custom-textarea" placeholder="格式示例：&#10;#分类名称&#10;-项目1 | 🎯&#10;-项目2 | 🌟"></textarea>
+	  <div id="custom-modal" class="modal-overlay">
+	    <div class="modal-content" style="position: relative;">
+	      <button class="close-modal-btn" id="close-custom-btn">
+	        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+	      </button>
+	      <h3 style="margin-top: 0; color: #d7265d; font-size: 1.25rem;">导入自定义表单</h3>
+	      <textarea id="custom-textarea" placeholder="在此粘贴您的表单脚本，例如：&#10;#我的分类&#10;-我的项目一 | 🎯&#10;-我的项目二 | 🌟"></textarea>
 	      
-	      <div id="share-link-container" style="display: none; margin-bottom: 15px; text-align: left;">
-	        <p style="margin: 0 0 5px; font-size: 14px; color: #5a2a41;">分享链接 (点击复制):</p>
-	        <input type="text" id="share-link-input" readonly style="width: 100%; padding: 8px; border: 1px solid #f8c8d0; border-radius: 5px; box-sizing: border-box; cursor: pointer; color: #ec4d7a; background: #fff5f7;">
+	      <div id="share-link-container" class="share-link-box" style="display: none;">
+	        <span>分享链接已生成 (点击输入框复制)</span>
+	        <div class="copy-input-group">
+	          <input type="text" id="share-link-input" readonly>
+	          <button id="copy-link-btn-addon">复制</button>
+	        </div>
 	      </div>
 
-	      <div class="modal-buttons" style="flex-wrap: wrap;">
-	        <button id="generate-share-btn" style="background-color: #f39c12; flex-basis: 100%; margin-bottom: 10px;">生成分享链接</button>
-	        <button id="confirm-btn">确定</button>
-	        <button id="cancel-btn">取消</button>
+	      <div class="modal-action-row">
+	        <button id="generate-share-btn" style="background: linear-gradient(135deg, #8a2be2 0%, #4a0e4e 100%); color: white;">生成分享链接</button>
+	        <button id="confirm-btn" style="background: linear-gradient(135deg, #ff758c 0%, #ec4d7a 100%); color: white;">开始测试</button>
 	      </div>
 	    </div>
 	  </div>
 
 	  <!-- 我的分享记录弹窗 -->
-	  <div id="my-shares-modal" style="display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.5); justify-content: center; align-items: center; z-index: 1000;">
-	    <div class="modal-content" style="max-height: 80vh; overflow-y: auto; text-align: left;">
-	      <h3 style="text-align: center; margin-top: 0;">我的分享记录</h3>
+	  <div id="my-shares-modal" class="modal-overlay">
+	    <div class="modal-content" style="position: relative; max-height: 85vh; display: flex; flex-direction: column;">
+	      <button class="close-modal-btn" id="close-shares-btn">
+	        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+	      </button>
+	      <h3 style="margin-top: 0; color: #d7265d; font-size: 1.25rem; text-align: center; margin-bottom: 20px;">我的分享记录</h3>
 	      <div id="shares-list"></div>
-	      <div class="modal-buttons" style="margin-top: 20px;">
-	        <button id="close-shares-btn">关闭</button>
+	    </div>
+	  </div>
+
+	  <!-- 帮助须知弹窗 -->
+	  <div id="help-modal" class="modal-overlay">
+	    <div class="modal-content" style="position: relative; max-height: 85vh; display: flex; flex-direction: column;">
+	      <button class="close-modal-btn" id="close-help-btn">
+	        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+	      </button>
+	      <h3 style="margin-top: 0; color: #d7265d; font-size: 1.25rem; text-align: center; margin-bottom: 20px;">自测表使用帮助</h3>
+	      <div style="font-size: 14px; line-height: 1.6; color: #5a2a41; overflow-y: auto; padding-right: 4px;">
+	        <p><b>1. 什么是 KinkForm？</b><br>这是一款支持自定义表单偏好的测评系统。您可以通过打分来生成直观的兴趣与偏好报告。</p>
+	        <p><b>2. 默认自测 vs 导入自定义</b><br>• 默认自测：使用系统内置的自测问卷。<br>• 载入自定义：允许粘贴您或他人设计的问卷文本进行测评。</p>
+	        <p><b>3. 自定义脚本语法格式：</b></p>
+	        <pre style="background: #fff5f7; padding: 10px; border-radius: 8px; font-size: 12px; border: 1px solid #f8c8d0; overflow-x: auto; white-space: pre-wrap; font-family: monospace;">#分类名称
+-测试项目一 | 🎯
+-测试项目二 | 🌟</pre>
+	        <p><i>（每行一个分类或项目，用竖线分隔表情，Emoji表情是可选的）</i></p>
+	        <p><b>4. 24小时分享与续期</b><br>您可以生成分享短链接，链接在云端<b>仅存活24小时</b>。所有的分享记录都将自动保存在您本地浏览器的“分享记录”中，您可以随时点击<b>“续期”</b>重新激活链接。</p>
 	      </div>
 	    </div>
 	  </div>
 
+	  <!-- 昵称输入弹窗 -->
+	  <div id="name-modal" class="modal-overlay">
+	    <div class="modal-content" style="position: relative; text-align: center; max-width: 360px;">
+	      <button class="close-modal-btn" id="close-name-btn">
+	        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+	      </button>
+	      <h3 style="margin-top: 0; color: #d7265d; font-size: 1.25rem; margin-bottom: 20px;">请填写您的昵称</h3>
+	      <input type="text" id="name-input" placeholder="输入昵称 (不超过10个字)" maxlength="10" style="width: 100%; padding: 12px; border: 1px solid rgba(236, 77, 122, 0.2); border-radius: 12px; margin-bottom: 20px; font-size: 15px; text-align: center; box-sizing: border-box; background: rgba(255,255,255,0.75);">
+	      <button id="start-btn" style="width: 100%; padding: 14px; border-radius: 12px; font-size: 16px; cursor: pointer; background: linear-gradient(135deg, #ff758c 0%, #ec4d7a 100%); color: white; border: none; font-weight: bold; transition: all 0.3s ease; box-shadow: 0 4px 12px rgba(236, 77, 122, 0.2);">开始测评</button>
+	    </div>
+	  </div>
+
 	  <!-- 加载遮罩 -->
-	  <div id="loading-overlay" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(255,255,255,0.9); z-index: 9999; justify-content: center; align-items: center; flex-direction: column;">
+	  <div id="loading-overlay" class="modal-overlay" style="flex-direction: column;">
 	    <div class="spinner" style="border: 4px solid #f8c8d0; border-top: 4px solid #ec4d7a; border-radius: 50%; width: 40px; height: 40px; animation: spin 1s linear infinite;"></div>
 	    <p id="loading-text" style="color: #ec4d7a; margin-top: 15px; font-weight: bold;">加载中...</p>
 	  </div>

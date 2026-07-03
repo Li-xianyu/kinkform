@@ -103,28 +103,10 @@ function start() {
 
 
 function renderNameInput() {
-  document.getElementById('home-page').style.display = 'none';
-  document.getElementById('app').style.display = 'block';
-  const app = document.getElementById('app');
-  app.innerHTML = `
-    <div class="name-card">
-      <h2>请填写测评人昵称</h2>
-      <input type="text" id="name-input" placeholder="输入昵称(不超过10个字)" maxlength="10">
-      <button id="start-btn">开始测评</button>
-    </div>
-  `;
-
-  document.getElementById('start-btn').addEventListener('click', () => {
-    const nameInput = document.getElementById('name-input').value.trim();
-    if (nameInput) {
-      userName = nameInput;
-      isNameSubmitted = true;
-      initApp(); // 初始化主应用
-      controlBtnClickSound.play();
-    } else {
-      alert('请输入昵称哦~');
-    }
-  });
+  document.getElementById('name-modal').classList.add('active');
+  setTimeout(() => {
+    document.getElementById('name-input').focus();
+  }, 100);
 }
 
 
@@ -456,12 +438,12 @@ function initHomePage() {
   };
 
   document.getElementById('custom-btn').onclick = () => {
-    document.getElementById('custom-modal').style.display = 'flex';
+    document.getElementById('custom-modal').classList.add('active');
     document.getElementById('share-link-container').style.display = 'none';
   };
 
   document.getElementById('help-btn').onclick = () => {
-    // alert("使用说明：\n...");
+    document.getElementById('help-modal').classList.add('active');
   };
 
   document.getElementById('generate-share-btn').onclick = async function() {
@@ -478,7 +460,7 @@ function initHomePage() {
       return;
     }
     
-    document.getElementById('loading-overlay').style.display = 'flex';
+    document.getElementById('loading-overlay').classList.add('active');
     document.getElementById('loading-text').textContent = '正在生成分享链接...';
     
     try {
@@ -523,7 +505,7 @@ function initHomePage() {
       console.error('生成分享链接失败:', error);
       alert('失败: ' + error.message);
     } finally {
-      document.getElementById('loading-overlay').style.display = 'none';
+      document.getElementById('loading-overlay').classList.remove('active');
     }
   };
 
@@ -537,25 +519,79 @@ function initHomePage() {
     const customText = document.querySelector('#custom-textarea').value.trim();
     if (customText) {
       currentText = customText;
-      document.getElementById('custom-modal').style.display = 'none';
+      document.getElementById('custom-modal').classList.remove('active');
       start();
     } else {
       alert('请输入有效的自测表内容！');
     }
   };
 
-  document.getElementById('cancel-btn').onclick = () => {
-    document.getElementById('custom-modal').style.display = 'none';
+  document.getElementById('close-custom-btn').onclick = () => {
+    document.getElementById('custom-modal').classList.remove('active');
     document.getElementById('share-link-container').style.display = 'none';
   };
 
+  const copyAddon = document.getElementById('copy-link-btn-addon');
+  if (copyAddon) {
+    copyAddon.onclick = () => {
+      const linkInput = document.getElementById('share-link-input');
+      linkInput.select();
+      document.execCommand('copy');
+      alert('分享链接已复制！');
+    };
+  }
+
   document.getElementById('my-shares-btn').onclick = () => {
     renderShares();
-    document.getElementById('my-shares-modal').style.display = 'flex';
+    document.getElementById('my-shares-modal').classList.add('active');
   };
 
   document.getElementById('close-shares-btn').onclick = () => {
-    document.getElementById('my-shares-modal').style.display = 'none';
+    document.getElementById('my-shares-modal').classList.remove('active');
+  };
+
+  document.getElementById('close-help-btn').onclick = () => {
+    document.getElementById('help-modal').classList.remove('active');
+  };
+
+  document.getElementById('start-btn').onclick = () => {
+    const nameInput = document.getElementById('name-input').value.trim();
+    if (nameInput) {
+      userName = nameInput;
+      isNameSubmitted = true;
+      document.getElementById('name-modal').classList.remove('active');
+      document.getElementById('home-page').style.display = 'none';
+      document.getElementById('app').style.display = 'block';
+      initApp();
+      controlBtnClickSound.play();
+    } else {
+      alert('请输入昵称哦~');
+    }
+  };
+
+  document.getElementById('close-name-btn').onclick = () => {
+    document.getElementById('name-modal').classList.remove('active');
+  };
+
+  // 轨道顺时针旋转逻辑
+  let currentRotation = 0;
+  document.getElementById('core-btn').onclick = () => {
+    currentRotation += 90;
+    controlBtnClickSound.currentTime = 0;
+    controlBtnClickSound.play().catch(e => console.error("音效播放错误: ", e));
+    
+    const wrappers = ['wrapper-default', 'wrapper-custom', 'wrapper-shares', 'wrapper-help'];
+    wrappers.forEach(id => {
+      const el = document.getElementById(id);
+      if (el) {
+        el.style.setProperty('--rot', `${currentRotation}deg`);
+        // 同步更新按钮的逆向旋转，确保文字/图标在旋转过程中始终直立
+        const btn = el.querySelector('.galaxy-node');
+        if (btn) {
+          btn.style.setProperty('--rot', `${currentRotation}deg`);
+        }
+      }
+    });
   };
 }
 
@@ -563,7 +599,7 @@ function renderShares() {
   const shares = JSON.parse(localStorage.getItem('kinkform_shares') || '[]');
   const listEl = document.getElementById('shares-list');
   if (shares.length === 0) {
-    listEl.innerHTML = '<p style="text-align:center; color:#999;">暂无分享记录</p>';
+    listEl.innerHTML = '<p style="text-align:center; color:#999; margin: 40px 0;">暂无分享记录</p>';
     return;
   }
   
@@ -571,30 +607,36 @@ function renderShares() {
   // 按时间倒序
   shares.sort((a,b) => b.timestamp - a.timestamp).forEach((share, index) => {
     const item = document.createElement('div');
-    item.className = 'share-item';
     const now = Date.now();
     const expireTime = share.timestamp + 86400 * 1000;
     const isExpired = now > expireTime;
     
-    let statusHtml = '';
-    let actionsHtml = '';
+    item.className = `share-card ${isExpired ? 'expired' : ''}`;
+    
+    let statusText = '';
+    let statusClass = '';
+    let actionBtnHtml = '';
     
     if (isExpired) {
-      statusHtml = '<span style="color:red;">(已过期)</span>';
-      actionsHtml = `<button onclick="extendShare(${index})" style="background:#f39c12;color:white;">续期一天</button>`;
+      statusText = '已过期';
+      statusClass = 'status-expired';
+      actionBtnHtml = `<button class="share-card-action-btn btn-renew" onclick="extendShare(${index})">🔄 续期</button>`;
     } else {
-      const hoursLeft = Math.floor((expireTime - now) / 3600000);
-      statusHtml = `<span style="color:green;">(约${hoursLeft}小时后过期)</span>`;
-      actionsHtml = `<button onclick="copyShare('${share.key}')" style="background:#1abc9c;color:white;">复制链接</button>`;
+      const hoursLeft = Math.max(1, Math.floor((expireTime - now) / 3600000));
+      statusText = `约${hoursLeft}小时后过期`;
+      statusClass = 'status-active';
+      actionBtnHtml = `<button class="share-card-action-btn btn-copy" onclick="copyShare('${share.key}')">🔗 复制</button>`;
     }
     
     item.innerHTML = `
-      <h4>${share.title.replace('#','')}</h4>
-      <p>短链接Key: <b>${share.key}</b> ${statusHtml}</p>
-      <p style="font-size:12px;">生成时间: ${new Date(share.timestamp).toLocaleString()}</p>
-      <div class="actions">
-        ${actionsHtml}
-        <button onclick="deleteShare(${index})" style="background:#ccc;">删除记录</button>
+      <div class="share-card-header">
+        <h4 class="share-card-title">${share.title.replace('#','').trim()}</h4>
+        <span class="share-card-status ${statusClass}">${statusText}</span>
+      </div>
+      <div class="share-card-time">Key: <b>${share.key}</b> | 生成时间: ${new Date(share.timestamp).toLocaleString()}</div>
+      <div class="share-card-actions">
+        ${actionBtnHtml}
+        <button class="share-card-action-btn btn-delete" onclick="deleteShare(${index})">🗑️ 删除</button>
       </div>
     `;
     listEl.appendChild(item);
@@ -625,7 +667,7 @@ window.extendShare = async (index) => {
   shares.sort((a,b) => b.timestamp - a.timestamp);
   const share = shares[index];
   
-  document.getElementById('loading-overlay').style.display = 'flex';
+  document.getElementById('loading-overlay').classList.add('active');
   document.getElementById('loading-text').textContent = '正在为您续期...';
   
   try {
@@ -646,7 +688,7 @@ window.extendShare = async (index) => {
   } catch(e) {
     alert('续期失败: ' + e.message);
   } finally {
-    document.getElementById('loading-overlay').style.display = 'none';
+    document.getElementById('loading-overlay').classList.remove('active');
   }
 };
 
@@ -655,7 +697,7 @@ async function checkUrlParams() {
   const key = urlParams.get('key');
   
   if (key) {
-    document.getElementById('loading-overlay').style.display = 'flex';
+    document.getElementById('loading-overlay').classList.add('active');
     document.getElementById('loading-text').textContent = '正在载入分享的自测表...';
     
     try {
@@ -671,7 +713,7 @@ async function checkUrlParams() {
       console.error('加载分享配置失败:', error);
       alert('网络错误，无法加载分享的自测表。');
     } finally {
-      document.getElementById('loading-overlay').style.display = 'none';
+      document.getElementById('loading-overlay').classList.remove('active');
       // 移除 URL 中的 key 参数避免刷新重复加载
       window.history.replaceState({}, document.title, window.location.pathname);
     }
