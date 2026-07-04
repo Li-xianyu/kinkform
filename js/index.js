@@ -295,231 +295,433 @@ document.addEventListener('click', function(event) {
 
 
 
+// ====== Result Page Rendering Engine ======
+
+function calcCategoryAvg(category) {
+  const sum = category.items.reduce((acc, item) => acc + item.rate, 0);
+  return category.items.length ? sum / category.items.length : 0;
+}
+
+function calcOverallAvg(categories) {
+  const sum = categories.reduce((acc, cat) => acc + calcCategoryAvg(cat), 0);
+  return categories.length ? sum / categories.length : 0;
+}
+
+function findTopCategory(categories) {
+  let best = null, bestAvg = -1;
+  categories.forEach(cat => {
+    const avg = calcCategoryAvg(cat);
+    if (avg > bestAvg) { bestAvg = avg; best = cat; }
+  });
+  return best;
+}
+
+function formatDate(ts) {
+  const d = new Date(ts);
+  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+}
+
+function createProfileHeader(userName, categories, timestamp) {
+  const header = document.createElement('div');
+  header.className = 'result-header';
+  const avg = calcOverallAvg(categories);
+  const top = findTopCategory(categories);
+  const topEmoji = top?.items[0]?.emoji || '🏆';
+
+  header.innerHTML = `
+    <div class="result-header-main">
+      <div class="result-header-avatar">${userName[0]}</div>
+      <div class="result-header-info">
+        <h2 class="result-header-name">${userName}</h2>
+        <div class="result-header-meta">
+          <span class="meta-date">${formatDate(timestamp)}</span>
+          <span class="meta-divider">·</span>
+          <span class="meta-top">${topEmoji} ${top?.name?.replace('偏好', '').trim() || ''}</span>
+        </div>
+      </div>
+    </div>
+    <div class="result-header-badge">
+      <span class="badge-value">${avg.toFixed(1)}</span>
+      <span class="badge-label">综合偏好</span>
+    </div>
+  `;
+  return header;
+}
+
+function createRadarChart(categories) {
+  const n = categories.length;
+  if (n < 3) {
+    const div = document.createElement('div');
+    div.className = 'chart-container';
+    div.innerHTML = '<p style="color:#aaa;text-align:center;padding:30px 20px;font-size:14px;">分类数量不足，无法生成雷达图</p>';
+    return div;
+  }
+
+  const cx = 150, cy = 150, maxR = 110;
+  const svgNS = 'http://www.w3.org/2000/svg';
+  const svg = document.createElementNS(svgNS, 'svg');
+  svg.setAttribute('viewBox', '0 0 300 320');
+  svg.classList.add('radar-chart');
+
+  const angles = categories.map((_, i) => (2 * Math.PI * i / n) - Math.PI / 2);
+
+  [0.25, 0.5, 0.75, 1].forEach(ratio => {
+    const pts = angles.map(a => {
+      const r = maxR * ratio;
+      return `${cx + r * Math.cos(a)},${cy + r * Math.sin(a)}`;
+    }).join(' ');
+    const poly = document.createElementNS(svgNS, 'polygon');
+    poly.setAttribute('points', pts);
+    poly.classList.add('radar-grid');
+    svg.appendChild(poly);
+  });
+
+  angles.forEach(a => {
+    const line = document.createElementNS(svgNS, 'line');
+    line.setAttribute('x1', cx); line.setAttribute('y1', cy);
+    line.setAttribute('x2', cx + maxR * Math.cos(a));
+    line.setAttribute('y2', cy + maxR * Math.sin(a));
+    line.classList.add('radar-axis');
+    svg.appendChild(line);
+  });
+
+  const avgScores = categories.map(c => calcCategoryAvg(c));
+  const dataPts = angles.map((a, i) => {
+    const r = Math.max(2, (avgScores[i] / 4) * maxR);
+    return `${cx + r * Math.cos(a)},${cy + r * Math.sin(a)}`;
+  }).join(' ');
+
+  const dataPoly = document.createElementNS(svgNS, 'polygon');
+  dataPoly.setAttribute('points', dataPts);
+  dataPoly.classList.add('radar-data');
+  svg.appendChild(dataPoly);
+
+  angles.forEach((a, i) => {
+    const r = Math.max(2, (avgScores[i] / 4) * maxR);
+    const dot = document.createElementNS(svgNS, 'circle');
+    dot.setAttribute('cx', cx + r * Math.cos(a));
+    dot.setAttribute('cy', cy + r * Math.sin(a));
+    dot.setAttribute('r', '4');
+    dot.classList.add('radar-dot');
+    svg.appendChild(dot);
+  });
+
+  angles.forEach((a, i) => {
+    const lr = maxR + 24;
+    const lx = cx + lr * Math.cos(a);
+    const ly = cy + lr * Math.sin(a);
+    const text = document.createElementNS(svgNS, 'text');
+    text.setAttribute('x', lx); text.setAttribute('y', ly);
+    text.setAttribute('text-anchor', 'middle');
+    text.setAttribute('dominant-baseline', 'middle');
+    text.classList.add('radar-label');
+    const cat = categories[i];
+    const emoji = cat.items[0]?.emoji || '';
+    text.textContent = emoji || cat.name.replace('偏好', '').trim();
+    svg.appendChild(text);
+  });
+
+  const wrapper = document.createElement('div');
+  wrapper.className = 'chart-container';
+  wrapper.appendChild(svg);
+  return wrapper;
+}
+
+function createDonutChart(categories) {
+  const colors = ['#f3e6e8', '#f8c8d0', '#f58cab', '#ec4d7a', '#d7265d'];
+  const labels = ['不接受', '无所谓', '一般', '喜欢', '超爱'];
+  const rateCounts = [0, 0, 0, 0, 0];
+  let total = 0;
+  categories.forEach(c => c.items.forEach(item => { rateCounts[item.rate || 0]++; total++; }));
+
+  const wrapper = document.createElement('div');
+  wrapper.className = 'chart-container donut-wrapper';
+
+  const svgNS = 'http://www.w3.org/2000/svg';
+  const svg = document.createElementNS(svgNS, 'svg');
+  svg.setAttribute('viewBox', '0 0 200 200');
+  svg.classList.add('donut-chart');
+
+  const cx = 100, cy = 100, r = 72;
+  const circumference = 2 * Math.PI * r;
+  let offset = 0;
+
+  rateCounts.forEach((count, i) => {
+    if (count === 0) return;
+    const seg = (count / total) * circumference;
+    const arc = document.createElementNS(svgNS, 'circle');
+    arc.setAttribute('cx', cx); arc.setAttribute('cy', cy);
+    arc.setAttribute('r', r);
+    arc.setAttribute('fill', 'none');
+    arc.setAttribute('stroke', colors[i]);
+    arc.setAttribute('stroke-width', '30');
+    arc.setAttribute('stroke-dasharray', `${seg} ${circumference - seg}`);
+    arc.setAttribute('stroke-dashoffset', -offset);
+    arc.setAttribute('transform', `rotate(-90 ${cx} ${cy})`);
+    arc.classList.add('donut-segment');
+    svg.appendChild(arc);
+    offset += seg;
+  });
+
+  const ct = document.createElementNS(svgNS, 'text');
+  ct.setAttribute('x', cx); ct.setAttribute('y', cy - 6);
+  ct.setAttribute('text-anchor', 'middle');
+  ct.classList.add('donut-center-value');
+  ct.textContent = total;
+  svg.appendChild(ct);
+
+  const cl = document.createElementNS(svgNS, 'text');
+  cl.setAttribute('x', cx); cl.setAttribute('y', cy + 16);
+  cl.setAttribute('text-anchor', 'middle');
+  cl.classList.add('donut-center-label');
+  cl.textContent = '项目';
+  svg.appendChild(cl);
+
+  wrapper.appendChild(svg);
+
+  const legend = document.createElement('div');
+  legend.className = 'donut-legend';
+  rateCounts.forEach((count, i) => {
+    if (count === 0) return;
+    const item = document.createElement('span');
+    item.className = 'legend-item';
+    item.innerHTML = `<span class="legend-dot" style="background:${colors[i]}"></span>${labels[i]} <span class="legend-count">${count}</span>`;
+    legend.appendChild(item);
+  });
+  wrapper.appendChild(legend);
+  return wrapper;
+}
+
+function createHighlights(categories) {
+  const section = document.createElement('div');
+  section.className = 'result-section';
+
+  const allItems = [];
+  categories.forEach(cat => {
+    cat.items.forEach(item => {
+      allItems.push({ ...item, category: cat.name.replace('偏好', '').trim() });
+    });
+  });
+
+  const sorted = [...allItems].sort((a, b) => b.rate - a.rate);
+  const top = sorted.filter(i => i.rate >= 3).slice(0, 3);
+  const bottom = sorted.filter(i => i.rate <= 1).slice(0, 3);
+
+  section.innerHTML = '<h3 class="section-title">🏅 偏好亮点</h3>';
+  const grid = document.createElement('div');
+  grid.className = 'highlights-grid';
+
+  if (top.length) {
+    const col = document.createElement('div');
+    col.className = 'highlights-col top-col';
+    col.innerHTML = '<div class="highlights-col-title">❤️ 最爱</div>';
+    top.forEach(item => {
+      const el = document.createElement('div');
+      el.className = 'highlight-item top-item';
+      const hearts = '❤️'.repeat(Math.max(1, item.rate - 1));
+      el.innerHTML = `<span class="hi-emoji">${item.emoji}</span><span class="hi-label">${item.label}</span><span class="hi-cat">${item.category}</span><span class="hi-score">${hearts}</span>`;
+      col.appendChild(el);
+    });
+    grid.appendChild(col);
+  }
+
+  if (bottom.length) {
+    const col = document.createElement('div');
+    col.className = 'highlights-col bottom-col';
+    col.innerHTML = '<div class="highlights-col-title">😅 无感</div>';
+    bottom.forEach(item => {
+      const el = document.createElement('div');
+      el.className = 'highlight-item bottom-item';
+      el.innerHTML = `<span class="hi-emoji">${item.emoji}</span><span class="hi-label">${item.label}</span><span class="hi-cat">${item.category}</span><span class="hi-score">${item.rate === 0 ? '🈲' : '😐'}</span>`;
+      col.appendChild(el);
+    });
+    grid.appendChild(col);
+  }
+
+  section.appendChild(grid);
+  return section;
+}
+
+function createCategoryCard(category) {
+  const card = document.createElement('div');
+  card.className = 'category-card collapsed';
+
+  const avg = calcCategoryAvg(category);
+  const emoji = category.items[0]?.emoji || '';
+  const shortName = category.name.replace('偏好', '').trim();
+
+  const header = document.createElement('div');
+  header.className = 'card-header';
+  header.innerHTML = `
+    <span class="card-name">${emoji} ${shortName}</span>
+    <div class="card-avg-bar">
+      <div class="avg-bar-track">
+        <div class="avg-bar-fill" style="width:${(avg / 4) * 100}%"></div>
+      </div>
+      <span class="card-avg-score">${avg.toFixed(1)}</span>
+    </div>
+    <span class="card-toggle">▼</span>
+  `;
+  header.addEventListener('click', () => {
+    card.classList.toggle('collapsed');
+    header.querySelector('.card-toggle').textContent = card.classList.contains('collapsed') ? '▼' : '▲';
+  });
+  card.appendChild(header);
+
+  const body = document.createElement('div');
+  body.className = 'card-body';
+
+  const sorted = [...category.items].sort((a, b) => b.rate - a.rate);
+  sorted.forEach(item => {
+    const row = document.createElement('div');
+    row.className = 'item-bar';
+    const pct = (item.rate / 4) * 100;
+    row.innerHTML = `
+      <span class="item-bar-label">${item.emoji} ${item.label}</span>
+      <div class="item-bar-track">
+        <div class="item-bar-fill fill-rate-${item.rate}" style="width:${pct}%"></div>
+      </div>
+      <span class="item-bar-score score-rate-${item.rate}">${getRateText(item.rate)}</span>
+    `;
+    body.appendChild(row);
+  });
+
+  card.appendChild(body);
+  return card;
+}
+
+function createActionButtons(userName, categories) {
+  const container = document.createElement('div');
+  container.className = 'result-actions';
+
+  const saveBtn = document.createElement('button');
+  saveBtn.className = 'action-btn save-btn';
+  saveBtn.innerHTML = '📷 保存结果图片';
+  saveBtn.addEventListener('click', async () => {
+    try {
+      const resultPage = document.querySelector('#result-page');
+      const btns = [...resultPage.querySelectorAll('.action-btn, .result-back-btn')];
+      btns.forEach(b => b.style.visibility = 'hidden');
+
+      const wm = document.createElement('div');
+      wm.textContent = 'KinkForm · 李咸鱼';
+      wm.style.cssText = 'position:absolute;bottom:10px;right:10px;font-size:12px;color:rgba(0,0,0,0.2);font-family:sans-serif;z-index:9999;';
+      resultPage.appendChild(wm);
+
+      const ld = document.createElement('div');
+      ld.textContent = '正在生成图片...';
+      ld.style.cssText = 'position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);background:rgba(0,0,0,0.7);color:white;padding:10px 20px;border-radius:5px;z-index:1000;';
+      document.body.appendChild(ld);
+
+      const canvas = await html2canvas(resultPage, { backgroundColor: '#fff5f7', scale: 2 });
+      resultPage.removeChild(wm);
+      document.body.removeChild(ld);
+      btns.forEach(b => b.style.visibility = '');
+
+      const link = document.createElement('a');
+      link.download = `${userName}的KinkForm测评结果.png`;
+      link.href = canvas.toDataURL('image/png', 1.0);
+      link.click();
+    } catch (error) {
+      console.error('生成图片失败:', error);
+      alert('图片生成失败，请重试');
+    }
+  });
+
+  const shareBtn = document.createElement('button');
+  shareBtn.className = 'action-btn share-btn';
+  shareBtn.innerHTML = '🔗 生成分享链接';
+  shareBtn.addEventListener('click', async () => {
+    try {
+      const ld = document.createElement('div');
+      ld.textContent = '正在生成分享链接...';
+      ld.style.cssText = 'position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);background:rgba(0,0,0,0.7);color:white;padding:10px 20px;border-radius:5px;z-index:1000;';
+      document.body.appendChild(ld);
+
+      const response = await fetch(`${API_BASE_URL}/api/result`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userName, categories })
+      });
+
+      document.body.removeChild(ld);
+      if (!response.ok) { const r = await response.json(); throw new Error(r.error || '网络请求失败'); }
+
+      const data = await response.json();
+      const shareUrl = `${window.location.origin}${window.location.pathname}?result=${data.key}`;
+      if (navigator.clipboard && window.isSecureContext) navigator.clipboard.writeText(shareUrl);
+
+      const box = document.createElement('div');
+      box.className = 'share-link-box-result';
+      box.innerHTML = `<div class="share-link-label">✅ 分享链接已生成（已复制）</div><input type="text" class="share-link-input-result" value="${shareUrl}" readonly>`;
+      box.querySelector('input').addEventListener('click', (e) => { e.target.select(); if (navigator.clipboard && window.isSecureContext) navigator.clipboard.writeText(shareUrl); });
+      shareBtn.insertAdjacentElement('afterend', box);
+    } catch (error) {
+      console.error('生成分享链接失败:', error);
+      alert('失败: ' + error.message);
+    }
+  });
+
+  container.appendChild(saveBtn);
+  container.appendChild(shareBtn);
+  return container;
+}
+
+function renderFullResult(userName, categories, timestamp, backToHome) {
+  const resultPage = document.querySelector('#result-page');
+  const mainPage = document.querySelector('#main-page');
+  mainPage.style.display = 'none';
+  resultPage.style.display = 'block';
+  resultPage.innerHTML = '';
+
+  const backBtn = document.createElement('button');
+  backBtn.className = 'result-back-btn';
+  backBtn.innerHTML = backToHome ? '← 返回首页' : '← 返回修改';
+  backBtn.addEventListener('click', () => {
+    if (backToHome) {
+      document.getElementById('app').style.display = 'none';
+      document.getElementById('home-page').style.display = 'block';
+      window.history.replaceState({}, document.title, window.location.pathname);
+    } else {
+      mainPage.style.display = 'block';
+      resultPage.style.display = 'none';
+      controlBtnClickSound.currentTime = 0;
+      controlBtnClickSound.play();
+    }
+  });
+  resultPage.appendChild(backBtn);
+  resultPage.appendChild(createProfileHeader(userName, categories, timestamp));
+
+  const chartsRow = document.createElement('div');
+  chartsRow.className = 'charts-row';
+  const radarSec = document.createElement('div');
+  radarSec.className = 'result-section';
+  radarSec.innerHTML = '<h3 class="section-title">📊 综合画像</h3>';
+  radarSec.appendChild(createRadarChart(categories));
+  chartsRow.appendChild(radarSec);
+  const donutSec = document.createElement('div');
+  donutSec.className = 'result-section';
+  donutSec.innerHTML = '<h3 class="section-title">📈 评分分布</h3>';
+  donutSec.appendChild(createDonutChart(categories));
+  chartsRow.appendChild(donutSec);
+  resultPage.appendChild(chartsRow);
+
+  resultPage.appendChild(createHighlights(categories));
+
+  const cardSec = document.createElement('div');
+  cardSec.className = 'result-section';
+  cardSec.innerHTML = '<h3 class="section-title">📋 分类详情</h3>';
+  const cardGrid = document.createElement('div');
+  cardGrid.className = 'category-cards-grid';
+  categories.forEach(cat => cardGrid.appendChild(createCategoryCard(cat)));
+  cardSec.appendChild(cardGrid);
+  resultPage.appendChild(cardSec);
+
+  resultPage.appendChild(createActionButtons(userName, categories));
+}
+
 function showResult() {
-	const resultPage = document.querySelector('#result-page');
-	const mainPage = document.querySelector('#main-page');
-
-	mainPage.style.display = 'none';
-	resultPage.style.display = 'block';
-	resultPage.innerHTML = `
-	    <div class="user-header">
-	      <h2>${userName}的偏好自测</h2>
-	    </div>
-	  `;
-	
-	
-	
-
-	const rateLabels = [
-		'不接受 🈲',
-		'无所谓 😐',
-		'一般 🙂',
-		'喜欢 😍',
-		'超爱 🥰'
-	];
-
-	const backBtn = document.createElement('button');
-	backBtn.textContent = '← 返回修改';
-	backBtn.style.position = 'absolute';  // 新增
-	backBtn.style.left = '0';             // 新增
-	backBtn.style.top = '0';              // 新增
-	backBtn.style.margin = '10px';        // 修改
-	backBtn.style.padding = '10px 12px';   // 调整
-	backBtn.style.borderRadius = '8px';
-	backBtn.style.cursor = 'pointer';
-	backBtn.style.border = 'none';
-	backBtn.style.backgroundColor = '#f8c8d0';
-	backBtn.style.fontWeight = 'bold';
-	backBtn.style.zIndex = '1';  
-
-	backBtn.onclick = () => {
-		mainPage.style.display = 'block';
-		resultPage.style.display = 'none';
-		controlBtnClickSound.currentTime = 0;
-		controlBtnClickSound.play();
-	};
-
-	resultPage.appendChild(backBtn);
-
-	categories.forEach((category) => {
-		const title = document.createElement('h3');
-		title.textContent = `【${category.name}】`;
-		title.style.color = '#5a2a41';
-		resultPage.appendChild(title);
-
-		category.items.forEach((item) => {
-			const rate = item.rate || 0;
-			const line = document.createElement('p');
-			line.textContent = `${item.emoji ? item.emoji + ' ' : ''}${item.label}：${rateLabels[rate]}`;
-			line.style.margin = '6px 0';
-			resultPage.appendChild(line);
-		});
-	});
-	
-	const shareContainer = document.createElement('div');
-	  shareContainer.style.margin = '20px 0';
-	  shareContainer.style.display = 'flex';
-	  shareContainer.style.justifyContent = 'center';
-	  shareContainer.style.gap = '10px';
-	
-	  // 创建分享按钮
-	  const shareBtn = document.createElement('button');
-	  shareBtn.innerHTML = '📷 保存结果图片';
-	  shareBtn.style.padding = '10px 20px';
-	  shareBtn.style.background = 'linear-gradient(135deg, #f8c8d0, #ec4d7a)';
-	  shareBtn.style.color = 'white';
-	  shareBtn.style.border = 'none';
-	  shareBtn.style.borderRadius = '20px';
-	  shareBtn.style.cursor = 'pointer';
-	
-	  shareBtn.addEventListener('click', async () => {
-	    try {
-	      // 1. 隐藏所有按钮
-	      const buttons = [...resultPage.querySelectorAll('button')];
-	      buttons.forEach(btn => btn.style.visibility = 'hidden');
-	      
-	      // 2. 添加水印元素
-	      const watermark = document.createElement('div');
-	      watermark.innerHTML = 'KinkForm · 李咸鱼';
-	      watermark.style.position = 'absolute';
-	      watermark.style.bottom = '10px';
-	      watermark.style.right = '10px';
-	      watermark.style.fontSize = '12px';
-	      watermark.style.color = 'rgba(0,0,0,0.2)';
-	      watermark.style.fontFamily = 'sans-serif';
-	      watermark.style.zIndex = '9999';
-	      resultPage.appendChild(watermark);
-	      
-	      // 3. 添加加载提示
-	      const loading = document.createElement('div');
-	      loading.textContent = '正在生成图片...';
-	      loading.style.position = 'fixed';
-	      loading.style.top = '50%';
-	      loading.style.left = '50%';
-	      loading.style.transform = 'translate(-50%, -50%)';
-	      loading.style.background = 'rgba(0,0,0,0.7)';
-	      loading.style.color = 'white';
-	      loading.style.padding = '10px 20px';
-	      loading.style.borderRadius = '5px';
-	      loading.style.zIndex = '1000';
-	      document.body.appendChild(loading);
-	      
-	      // 4. 生成图片
-	      const canvas = await html2canvas(resultPage, {
-	        backgroundColor: '#fff5f7', // 使用你的主题色
-	        scale: 2 // 提高生成质量
-	      });
-	      
-	      // 5. 清理元素
-	      resultPage.removeChild(watermark);
-	      document.body.removeChild(loading);
-	      buttons.forEach(btn => btn.style.visibility = '');
-	      
-	      // 6. 下载图片
-	      const link = document.createElement('a');
-	      link.download = `${userName}的KinkForm测评结果.png`;
-	      link.href = canvas.toDataURL('image/png', 1.0);
-	      link.click();
-	      
-	    } catch (error) {
-	      console.error('生成图片失败:', error);
-	      alert('图片生成失败，请重试');
-	    }
-	  });
-	
-	  // 生成结果分享链接按钮
-	  const shareResultBtn = document.createElement('button');
-	  shareResultBtn.innerHTML = '🔗 生成分享链接';
-	  shareResultBtn.style.padding = '10px 20px';
-	  shareResultBtn.style.background = 'linear-gradient(135deg, #8a2be2, #4a0e4e)';
-	  shareResultBtn.style.color = 'white';
-	  shareResultBtn.style.border = 'none';
-	  shareResultBtn.style.borderRadius = '20px';
-	  shareResultBtn.style.cursor = 'pointer';
-
-	  shareResultBtn.addEventListener('click', async () => {
-	    try {
-	      const loading = document.createElement('div');
-	      loading.textContent = '正在生成分享链接...';
-	      loading.style.position = 'fixed';
-	      loading.style.top = '50%';
-	      loading.style.left = '50%';
-	      loading.style.transform = 'translate(-50%, -50%)';
-	      loading.style.background = 'rgba(0,0,0,0.7)';
-	      loading.style.color = 'white';
-	      loading.style.padding = '10px 20px';
-	      loading.style.borderRadius = '5px';
-	      loading.style.zIndex = '1000';
-	      document.body.appendChild(loading);
-
-	      const response = await fetch(`${API_BASE_URL}/api/result`, {
-	        method: 'POST',
-	        headers: { 'Content-Type': 'application/json' },
-	        body: JSON.stringify({ userName, categories: categories })
-	      });
-
-	      document.body.removeChild(loading);
-
-	      if (!response.ok) {
-	        const res = await response.json();
-	        throw new Error(res.error || '网络请求失败');
-	      }
-
-	      const data = await response.json();
-	      const shareUrl = `${window.location.origin}${window.location.pathname}?result=${data.key}`;
-
-	      if (navigator.clipboard && window.isSecureContext) {
-	        navigator.clipboard.writeText(shareUrl);
-	      }
-
-	      const linkContainer = document.createElement('div');
-	      linkContainer.style.margin = '10px 0';
-	      linkContainer.style.padding = '10px';
-	      linkContainer.style.background = '#f0e6ff';
-	      linkContainer.style.border = '1px dashed #8a2be2';
-	      linkContainer.style.borderRadius = '12px';
-	      linkContainer.style.textAlign = 'center';
-
-	      const linkLabel = document.createElement('div');
-	      linkLabel.textContent = '✅ 分享链接已生成（已复制）';
-	      linkLabel.style.fontSize = '12px';
-	      linkLabel.style.color = '#4a0e4e';
-	      linkLabel.style.marginBottom = '6px';
-	      linkContainer.appendChild(linkLabel);
-
-	      const linkInput = document.createElement('input');
-	      linkInput.type = 'text';
-	      linkInput.value = shareUrl;
-	      linkInput.readOnly = true;
-	      linkInput.style.width = '100%';
-	      linkInput.style.padding = '8px';
-	      linkInput.style.border = '1px solid #8a2be2';
-	      linkInput.style.borderRadius = '8px';
-	      linkInput.style.fontSize = '13px';
-	      linkInput.style.color = '#4a0e4e';
-	      linkInput.style.background = 'white';
-	      linkInput.style.boxSizing = 'border-box';
-	      linkInput.onclick = () => {
-	        linkInput.select();
-	        if (navigator.clipboard && window.isSecureContext) {
-	          navigator.clipboard.writeText(shareUrl);
-	        }
-	      };
-	      linkContainer.appendChild(linkInput);
-
-	      shareResultBtn.insertAdjacentElement('afterend', linkContainer);
-	    } catch (error) {
-	      console.error('生成分享链接失败:', error);
-	      alert('失败: ' + error.message);
-	    }
-	  });
-
-	  shareContainer.appendChild(shareResultBtn);
-
-	  // 其他原有代码...
-	  shareContainer.appendChild(shareBtn);
-	  resultPage.appendChild(shareContainer);
-	
+  renderFullResult(userName, categories, Date.now(), false);
 }
 
 
@@ -802,52 +1004,7 @@ function renderResultData(data) {
   const homePage = document.getElementById('home-page');
   homePage.style.display = 'none';
   app.style.display = 'block';
-
-  const resultPage = document.querySelector('#result-page');
-  const mainPage = document.querySelector('#main-page');
-  mainPage.style.display = 'none';
-  resultPage.style.display = 'block';
-
-  const rateLabels = ['不接受 🈲', '无所谓 😐', '一般 🙂', '喜欢 😍', '超爱 🥰'];
-
-  resultPage.innerHTML = `
-    <div class="user-header">
-      <h2>${data.userName}的偏好自测</h2>
-    </div>
-  `;
-
-  const homeBtn = document.createElement('button');
-  homeBtn.textContent = '← 返回首页';
-  homeBtn.style.margin = '10px';
-  homeBtn.style.padding = '10px 12px';
-  homeBtn.style.borderRadius = '8px';
-  homeBtn.style.cursor = 'pointer';
-  homeBtn.style.border = 'none';
-  homeBtn.style.backgroundColor = '#f8c8d0';
-  homeBtn.style.fontWeight = 'bold';
-
-  homeBtn.onclick = () => {
-    app.style.display = 'none';
-    homePage.style.display = 'block';
-    window.history.replaceState({}, document.title, window.location.pathname);
-  };
-
-  resultPage.appendChild(homeBtn);
-
-  data.categories.forEach((category) => {
-    const title = document.createElement('h3');
-    title.textContent = `【${category.name}】`;
-    title.style.color = '#5a2a41';
-    resultPage.appendChild(title);
-
-    category.items.forEach((item) => {
-      const rate = item.rate || 0;
-      const line = document.createElement('p');
-      line.textContent = `${item.emoji ? item.emoji + ' ' : ''}${item.label}：${rateLabels[rate]}`;
-      line.style.margin = '6px 0';
-      resultPage.appendChild(line);
-    });
-  });
+  renderFullResult(data.userName, data.categories, data.timestamp, true);
 }
 
 async function checkUrlParams() {
@@ -859,28 +1016,51 @@ async function checkUrlParams() {
     document.getElementById('loading-overlay').classList.add('active');
     document.getElementById('loading-text').textContent = '正在载入分享结果...';
 
-    try {
-      const response = await fetch(`${API_BASE_URL}/api/result/${resultKey}`);
-      if (!response.ok) {
-        if (response.status === 404) {
-          alert('该分享结果已失效或不存在。');
-        } else {
-          alert('加载失败，请稍后重试。');
+    let lastError = null;
+    for (let attempt = 1; attempt <= 2; attempt++) {
+      try {
+        if (attempt === 2) {
+          document.getElementById('loading-text').textContent = '正在重试...';
         }
-        document.getElementById('loading-overlay').classList.remove('active');
-        window.history.replaceState({}, document.title, window.location.pathname);
-        return;
+        const response = await fetchWithTimeout(`${API_BASE_URL}/api/result/${resultKey}`, 12000);
+        if (response.ok) {
+          const data = await response.json();
+          document.getElementById('loading-overlay').classList.remove('active');
+          window.history.replaceState({}, document.title, window.location.pathname);
+          renderResultData(data);
+          return;
+        } else if (response.status === 404) {
+          alert('该分享结果已失效或不存在。');
+          break;
+        } else {
+          lastError = new Error(`服务器返回 ${response.status}`);
+        }
+      } catch (error) {
+        lastError = error;
+        if (error.name === 'AbortError') lastError = new Error('请求超时');
+        if (attempt < 2) await new Promise(r => setTimeout(r, 1500));
       }
-      const data = await response.json();
-      document.getElementById('loading-overlay').classList.remove('active');
-      window.history.replaceState({}, document.title, window.location.pathname);
-      renderResultData(data);
-    } catch (error) {
-      console.error('加载分享结果失败:', error);
-      alert('网络错误，无法加载分享结果。');
-      document.getElementById('loading-overlay').classList.remove('active');
-      window.history.replaceState({}, document.title, window.location.pathname);
     }
+
+    if (lastError) {
+      const isTimeout = lastError.message === '请求超时';
+      const isOffline = !navigator.onLine;
+      const ua = navigator.userAgent.toLowerCase();
+      const isWeChat = ua.indexOf('micromessenger') !== -1;
+      const isQQ = ua.indexOf('mqqbrowser') !== -1 || ua.indexOf('qq/') !== -1;
+
+      if (isOffline) alert('网络连接不可用，请检查网络后刷新重试。');
+      else if (isTimeout) {
+        if (isWeChat || isQQ) alert('提示：QQ/微信内置浏览器因 workers.dev 域名被国内屏蔽，建议点击右上角选择「在浏览器中打开」。');
+        else alert('请求超时，请稍后刷新或更换网络。');
+      } else {
+        if (isWeChat || isQQ) alert('加载失败。建议点击右上角选择「在浏览器中打开」重试。');
+        else alert('网络错误，无法加载分享结果，请稍后刷新重试。');
+      }
+    }
+
+    document.getElementById('loading-overlay').classList.remove('active');
+    window.history.replaceState({}, document.title, window.location.pathname);
     return;
   }
 
