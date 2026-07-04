@@ -348,119 +348,119 @@ function createProfileHeader(userName, categories, timestamp) {
   return header;
 }
 
-function createCategoryRanking(categories) {
-  const wrapper = document.createElement('div');
-  wrapper.className = 'chart-container ranking-chart';
-
-  const sorted = [...categories]
-    .map(c => ({ ...c, avg: calcCategoryAvg(c) }))
-    .sort((a, b) => b.avg - a.avg);
-
-  sorted.forEach(cat => {
-    const row = document.createElement('div');
-    row.className = 'ranking-row';
-    const pct = cat.items.length ? (cat.avg / 4) * 100 : 0;
-    const emoji = cat.items[0]?.emoji || '';
-    row.innerHTML = `
-      <span class="ranking-label">${emoji} ${cat.name.replace('偏好', '').trim()}</span>
-      <div class="ranking-track">
-        <div class="ranking-fill" style="width:${pct}%"></div>
-      </div>
-      <span class="ranking-score">${cat.avg.toFixed(1)}</span>
-    `;
-    wrapper.appendChild(row);
-  });
-  return wrapper;
-}
-
-function createScoreOverview(categories) {
+function createHeatSummary(categories) {
   const colors = ['#f3e6e8', '#f8c8d0', '#f58cab', '#ec4d7a', '#d7265d'];
   const labels = ['不接受', '无所谓', '一般', '喜欢', '超爱'];
   const rateCounts = [0, 0, 0, 0, 0];
-  let total = 0;
-  categories.forEach(c => c.items.forEach(item => { rateCounts[item.rate || 0]++; total++; }));
+  let totalScore = 0, totalItems = 0;
+  let bestCat = null, bestAvg = -1, worstCat = null, worstAvg = 5;
 
-  const wrapper = document.createElement('div');
-  wrapper.className = 'chart-container score-overview';
-
-  if (total === 0) {
-    wrapper.innerHTML = '<p style="color:#aaa;text-align:center;padding:20px;font-size:14px;">暂无评分数据</p>';
-    return wrapper;
-  }
-
-  const bar = document.createElement('div');
-  bar.className = 'score-stacked-bar';
-  rateCounts.forEach((count, i) => {
-    if (count === 0) return;
-    const seg = document.createElement('div');
-    seg.className = 'score-bar-segment';
-    seg.style.width = `${(count / total) * 100}%`;
-    seg.style.background = colors[i];
-    seg.title = `${labels[i]}: ${count}`;
-    bar.appendChild(seg);
+  categories.forEach(cat => {
+    let catSum = 0;
+    cat.items.forEach(item => {
+      const r = item.rate || 0;
+      rateCounts[r]++; totalScore += r; catSum += r; totalItems++;
+    });
+    const a = cat.items.length ? catSum / cat.items.length : 0;
+    if (a > bestAvg) { bestAvg = a; bestCat = cat; }
+    if (a < worstAvg) { worstAvg = a; worstCat = cat; }
   });
-  wrapper.appendChild(bar);
 
-  const legend = document.createElement('div');
-  legend.className = 'score-legend';
-  rateCounts.forEach((count, i) => {
-    if (count === 0) return;
-    const item = document.createElement('span');
-    item.className = 'score-legend-item';
-    item.innerHTML = `<span class="score-dot" style="background:${colors[i]}"></span>${labels[i]} <strong>${count}</strong>`;
-    legend.appendChild(item);
-  });
-  wrapper.appendChild(legend);
-  return wrapper;
-}
+  const heat = totalItems ? Math.round((totalScore / (totalItems * 4)) * 100) : 0;
+  let level, emoji;
+  if (heat < 20) { level = '冷淡'; emoji = '❄️'; }
+  else if (heat < 40) { level = '温和'; emoji = '🌱'; }
+  else if (heat < 60) { level = '适中'; emoji = '🌤️'; }
+  else if (heat < 80) { level = '热情'; emoji = '🔥'; }
+  else { level = '狂热'; emoji = '💥'; }
 
-function createHighlights(categories) {
   const section = document.createElement('div');
   section.className = 'result-section';
+  const title = document.createElement('h3');
+  title.className = 'section-title';
+  title.textContent = '📊 偏好热度';
+  section.appendChild(title);
 
-  const allItems = [];
+  const wrap = document.createElement('div');
+  wrap.className = 'heat-summary';
+
+  const heatColor = colors[Math.min(4, Math.floor(heat / 25))];
+  const circ = 2 * Math.PI * 44;
+
+  wrap.innerHTML = `
+    <div class="heat-main">
+      <div class="heat-ring-wrap">
+        <svg viewBox="0 0 120 120" class="heat-svg">
+          <circle cx="60" cy="60" r="44" fill="none" stroke="#f3e6e8" stroke-width="8"/>
+          <circle cx="60" cy="60" r="44" fill="none" stroke="${heatColor}" stroke-width="8"
+            stroke-dasharray="${(heat/100)*circ} ${circ}" stroke-linecap="round"
+            transform="rotate(-90 60 60)" style="transition: stroke-dasharray 0.8s ease"/>
+        </svg>
+        <span class="heat-value" style="color:${heatColor}">${heat}%</span>
+      </div>
+      <div class="heat-level-tag" style="background:${heatColor}15;color:${heatColor}">${emoji} ${level}</div>
+    </div>
+    <div class="heat-stats">
+      <div class="heat-stat"><span class="hs-label">🔥 最热衷</span><span class="hs-value">${bestCat?.items[0]?.emoji || ''} ${bestCat?.name?.replace('偏好','').trim() || '-'} ${bestAvg.toFixed(1)}</span></div>
+      <div class="heat-stat"><span class="hs-label">❄️ 最无感</span><span class="hs-value">${worstCat?.items[0]?.emoji || ''} ${worstCat?.name?.replace('偏好','').trim() || '-'} ${worstAvg.toFixed(1)}</span></div>
+      <div class="heat-stat"><span class="hs-label">📦 项目</span><span class="hs-value">${totalItems}</span></div>
+    </div>
+    <div class="heat-dist">
+      <div class="heat-dist-bar">${rateCounts.map((c, i) => c > 0 ? `<div style="width:${(c/totalItems)*100}%;background:${colors[i]}" class="heat-dist-seg"></div>` : '').join('')}</div>
+      <div class="heat-dist-labels">${rateCounts.map((c, i) => c > 0 ? `<span><i style="background:${colors[i]}"></i>${labels[i]} ${c}</span>` : '').join('')}</div>
+    </div>
+  `;
+
+  section.appendChild(wrap);
+  return section;
+}
+
+function createFullRanking(categories) {
+  const colors = ['#f3e6e8', '#f8c8d0', '#f58cab', '#ec4d7a', '#d7265d'];
+  const groupLabels = ['不接受 🈲', '无所谓 😐', '一般 🙂', '喜欢 😍', '超爱 🥰'];
+  const groups = [[], [], [], [], []];
+
   categories.forEach(cat => {
-    cat.items.forEach(item => {
-      allItems.push({ ...item, category: cat.name.replace('偏好', '').trim() });
-    });
+    const cn = cat.name.replace('偏好', '').trim();
+    cat.items.forEach(item => groups[(item.rate || 0)].push({ ...item, cn }));
   });
 
-  const sorted = [...allItems].sort((a, b) => b.rate - a.rate);
-  const top = sorted.filter(i => i.rate >= 3).slice(0, 3);
-  const bottom = sorted.filter(i => i.rate <= 1).slice(0, 3);
+  const section = document.createElement('div');
+  section.className = 'result-section';
+  const title = document.createElement('h3');
+  title.className = 'section-title';
+  title.textContent = '🏆 完整排行';
+  section.appendChild(title);
 
-  section.innerHTML = '<h3 class="section-title">🏅 偏好亮点</h3>';
-  const grid = document.createElement('div');
-  grid.className = 'highlights-grid';
+  const container = document.createElement('div');
+  container.className = 'full-ranking';
 
-  if (top.length) {
-    const col = document.createElement('div');
-    col.className = 'highlights-col top-col';
-    col.innerHTML = '<div class="highlights-col-title">❤️ 最爱</div>';
-    top.forEach(item => {
+  for (let s = 4; s >= 0; s--) {
+    const items = groups[s];
+    if (items.length === 0) continue;
+
+    const group = document.createElement('div');
+    group.className = 'ranking-group';
+    const hdr = document.createElement('div');
+    hdr.className = 'rg-header';
+    hdr.style.borderLeftColor = colors[s];
+    hdr.innerHTML = `<span class="rg-label">${groupLabels[s]}</span><span class="rg-count">${items.length}</span>`;
+    hdr.addEventListener('click', () => group.classList.toggle('collapsed'));
+    group.appendChild(hdr);
+
+    const body = document.createElement('div');
+    body.className = 'rg-body';
+    items.forEach(item => {
       const el = document.createElement('div');
-      el.className = 'highlight-item top-item';
-      const hearts = '❤️'.repeat(Math.max(1, item.rate - 1));
-      el.innerHTML = `<span class="hi-emoji">${item.emoji}</span><span class="hi-label">${item.label}</span><span class="hi-cat">${item.category}</span><span class="hi-score">${hearts}</span>`;
-      col.appendChild(el);
+      el.className = 'rg-item';
+      el.innerHTML = `<span class="ri-emoji">${item.emoji}</span><span class="ri-label">${item.label}</span><span class="ri-cat">${item.cn}</span>`;
+      body.appendChild(el);
     });
-    grid.appendChild(col);
+    group.appendChild(body);
+    container.appendChild(group);
   }
 
-  if (bottom.length) {
-    const col = document.createElement('div');
-    col.className = 'highlights-col bottom-col';
-    col.innerHTML = '<div class="highlights-col-title">😅 无感</div>';
-    bottom.forEach(item => {
-      const el = document.createElement('div');
-      el.className = 'highlight-item bottom-item';
-      el.innerHTML = `<span class="hi-emoji">${item.emoji}</span><span class="hi-label">${item.label}</span><span class="hi-cat">${item.category}</span><span class="hi-score">${item.rate === 0 ? '🈲' : '😐'}</span>`;
-      col.appendChild(el);
-    });
-    grid.appendChild(col);
-  }
-
-  section.appendChild(grid);
+  section.appendChild(container);
   return section;
 }
 
@@ -614,21 +614,8 @@ function renderFullResult(userName, categories, timestamp, backToHome) {
   resultPage.appendChild(backBtn);
   resultPage.appendChild(createProfileHeader(userName, categories, timestamp));
 
-  const chartsRow = document.createElement('div');
-  chartsRow.className = 'charts-row';
-  const rankSec = document.createElement('div');
-  rankSec.className = 'result-section';
-  rankSec.innerHTML = '<h3 class="section-title">📊 分类偏好排行</h3>';
-  rankSec.appendChild(createCategoryRanking(categories));
-  chartsRow.appendChild(rankSec);
-  const scoreSec = document.createElement('div');
-  scoreSec.className = 'result-section';
-  scoreSec.innerHTML = '<h3 class="section-title">📈 评分总览</h3>';
-  scoreSec.appendChild(createScoreOverview(categories));
-  chartsRow.appendChild(scoreSec);
-  resultPage.appendChild(chartsRow);
-
-  resultPage.appendChild(createHighlights(categories));
+  resultPage.appendChild(createHeatSummary(categories));
+  resultPage.appendChild(createFullRanking(categories));
 
   const cardSec = document.createElement('div');
   cardSec.className = 'result-section';
