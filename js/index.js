@@ -75,7 +75,9 @@ let inputText = `
 `;
 
 
-const API_BASE_URL = 'https://kinkform-api.lpswz0001.workers.dev'; // 部署后请改为您的 Worker 域名，如 https://kinkform-api.YOUR-NAME.workers.dev
+const API_BASE_URL = window.location.origin.startsWith('http') 
+  ? window.location.origin 
+  : 'https://kinkform.pages.dev';
 
 let userName = '';
 let isNameSubmitted = false;
