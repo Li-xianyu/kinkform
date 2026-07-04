@@ -348,86 +348,32 @@ function createProfileHeader(userName, categories, timestamp) {
   return header;
 }
 
-function createRadarChart(categories) {
-  const n = categories.length;
-  if (n < 3) {
-    const div = document.createElement('div');
-    div.className = 'chart-container';
-    div.innerHTML = '<p style="color:#aaa;text-align:center;padding:30px 20px;font-size:14px;">分类数量不足，无法生成雷达图</p>';
-    return div;
-  }
-
-  const cx = 150, cy = 150, maxR = 110;
-  const svgNS = 'http://www.w3.org/2000/svg';
-  const svg = document.createElementNS(svgNS, 'svg');
-  svg.setAttribute('viewBox', '0 0 300 320');
-  svg.classList.add('radar-chart');
-
-  const angles = categories.map((_, i) => (2 * Math.PI * i / n) - Math.PI / 2);
-
-  [0.25, 0.5, 0.75, 1].forEach(ratio => {
-    const pts = angles.map(a => {
-      const r = maxR * ratio;
-      return `${cx + r * Math.cos(a)},${cy + r * Math.sin(a)}`;
-    }).join(' ');
-    const poly = document.createElementNS(svgNS, 'polygon');
-    poly.setAttribute('points', pts);
-    poly.classList.add('radar-grid');
-    svg.appendChild(poly);
-  });
-
-  angles.forEach(a => {
-    const line = document.createElementNS(svgNS, 'line');
-    line.setAttribute('x1', cx); line.setAttribute('y1', cy);
-    line.setAttribute('x2', cx + maxR * Math.cos(a));
-    line.setAttribute('y2', cy + maxR * Math.sin(a));
-    line.classList.add('radar-axis');
-    svg.appendChild(line);
-  });
-
-  const avgScores = categories.map(c => calcCategoryAvg(c));
-  const dataPts = angles.map((a, i) => {
-    const r = Math.max(2, (avgScores[i] / 4) * maxR);
-    return `${cx + r * Math.cos(a)},${cy + r * Math.sin(a)}`;
-  }).join(' ');
-
-  const dataPoly = document.createElementNS(svgNS, 'polygon');
-  dataPoly.setAttribute('points', dataPts);
-  dataPoly.classList.add('radar-data');
-  svg.appendChild(dataPoly);
-
-  angles.forEach((a, i) => {
-    const r = Math.max(2, (avgScores[i] / 4) * maxR);
-    const dot = document.createElementNS(svgNS, 'circle');
-    dot.setAttribute('cx', cx + r * Math.cos(a));
-    dot.setAttribute('cy', cy + r * Math.sin(a));
-    dot.setAttribute('r', '4');
-    dot.classList.add('radar-dot');
-    svg.appendChild(dot);
-  });
-
-  angles.forEach((a, i) => {
-    const lr = maxR + 24;
-    const lx = cx + lr * Math.cos(a);
-    const ly = cy + lr * Math.sin(a);
-    const text = document.createElementNS(svgNS, 'text');
-    text.setAttribute('x', lx); text.setAttribute('y', ly);
-    text.setAttribute('text-anchor', 'middle');
-    text.setAttribute('dominant-baseline', 'middle');
-    text.classList.add('radar-label');
-    const cat = categories[i];
-    const emoji = cat.items[0]?.emoji || '';
-    text.textContent = emoji || cat.name.replace('偏好', '').trim();
-    svg.appendChild(text);
-  });
-
+function createCategoryRanking(categories) {
   const wrapper = document.createElement('div');
-  wrapper.className = 'chart-container';
-  wrapper.appendChild(svg);
+  wrapper.className = 'chart-container ranking-chart';
+
+  const sorted = [...categories]
+    .map(c => ({ ...c, avg: calcCategoryAvg(c) }))
+    .sort((a, b) => b.avg - a.avg);
+
+  sorted.forEach(cat => {
+    const row = document.createElement('div');
+    row.className = 'ranking-row';
+    const pct = cat.items.length ? (cat.avg / 4) * 100 : 0;
+    const emoji = cat.items[0]?.emoji || '';
+    row.innerHTML = `
+      <span class="ranking-label">${emoji} ${cat.name.replace('偏好', '').trim()}</span>
+      <div class="ranking-track">
+        <div class="ranking-fill" style="width:${pct}%"></div>
+      </div>
+      <span class="ranking-score">${cat.avg.toFixed(1)}</span>
+    `;
+    wrapper.appendChild(row);
+  });
   return wrapper;
 }
 
-function createDonutChart(categories) {
+function createScoreOverview(categories) {
   const colors = ['#f3e6e8', '#f8c8d0', '#f58cab', '#ec4d7a', '#d7265d'];
   const labels = ['不接受', '无所谓', '一般', '喜欢', '超爱'];
   const rateCounts = [0, 0, 0, 0, 0];
@@ -435,57 +381,33 @@ function createDonutChart(categories) {
   categories.forEach(c => c.items.forEach(item => { rateCounts[item.rate || 0]++; total++; }));
 
   const wrapper = document.createElement('div');
-  wrapper.className = 'chart-container donut-wrapper';
+  wrapper.className = 'chart-container score-overview';
 
-  const svgNS = 'http://www.w3.org/2000/svg';
-  const svg = document.createElementNS(svgNS, 'svg');
-  svg.setAttribute('viewBox', '0 0 200 200');
-  svg.classList.add('donut-chart');
+  if (total === 0) {
+    wrapper.innerHTML = '<p style="color:#aaa;text-align:center;padding:20px;font-size:14px;">暂无评分数据</p>';
+    return wrapper;
+  }
 
-  const cx = 100, cy = 100, r = 72;
-  const circumference = 2 * Math.PI * r;
-  let offset = 0;
-
+  const bar = document.createElement('div');
+  bar.className = 'score-stacked-bar';
   rateCounts.forEach((count, i) => {
     if (count === 0) return;
-    const seg = (count / total) * circumference;
-    const arc = document.createElementNS(svgNS, 'circle');
-    arc.setAttribute('cx', cx); arc.setAttribute('cy', cy);
-    arc.setAttribute('r', r);
-    arc.setAttribute('fill', 'none');
-    arc.setAttribute('stroke', colors[i]);
-    arc.setAttribute('stroke-width', '30');
-    arc.setAttribute('stroke-dasharray', `${seg} ${circumference - seg}`);
-    arc.setAttribute('stroke-dashoffset', -offset);
-    arc.setAttribute('transform', `rotate(-90 ${cx} ${cy})`);
-    arc.classList.add('donut-segment');
-    svg.appendChild(arc);
-    offset += seg;
+    const seg = document.createElement('div');
+    seg.className = 'score-bar-segment';
+    seg.style.width = `${(count / total) * 100}%`;
+    seg.style.background = colors[i];
+    seg.title = `${labels[i]}: ${count}`;
+    bar.appendChild(seg);
   });
-
-  const ct = document.createElementNS(svgNS, 'text');
-  ct.setAttribute('x', cx); ct.setAttribute('y', cy - 6);
-  ct.setAttribute('text-anchor', 'middle');
-  ct.classList.add('donut-center-value');
-  ct.textContent = total;
-  svg.appendChild(ct);
-
-  const cl = document.createElementNS(svgNS, 'text');
-  cl.setAttribute('x', cx); cl.setAttribute('y', cy + 16);
-  cl.setAttribute('text-anchor', 'middle');
-  cl.classList.add('donut-center-label');
-  cl.textContent = '项目';
-  svg.appendChild(cl);
-
-  wrapper.appendChild(svg);
+  wrapper.appendChild(bar);
 
   const legend = document.createElement('div');
-  legend.className = 'donut-legend';
+  legend.className = 'score-legend';
   rateCounts.forEach((count, i) => {
     if (count === 0) return;
     const item = document.createElement('span');
-    item.className = 'legend-item';
-    item.innerHTML = `<span class="legend-dot" style="background:${colors[i]}"></span>${labels[i]} <span class="legend-count">${count}</span>`;
+    item.className = 'score-legend-item';
+    item.innerHTML = `<span class="score-dot" style="background:${colors[i]}"></span>${labels[i]} <strong>${count}</strong>`;
     legend.appendChild(item);
   });
   wrapper.appendChild(legend);
@@ -694,16 +616,16 @@ function renderFullResult(userName, categories, timestamp, backToHome) {
 
   const chartsRow = document.createElement('div');
   chartsRow.className = 'charts-row';
-  const radarSec = document.createElement('div');
-  radarSec.className = 'result-section';
-  radarSec.innerHTML = '<h3 class="section-title">📊 综合画像</h3>';
-  radarSec.appendChild(createRadarChart(categories));
-  chartsRow.appendChild(radarSec);
-  const donutSec = document.createElement('div');
-  donutSec.className = 'result-section';
-  donutSec.innerHTML = '<h3 class="section-title">📈 评分分布</h3>';
-  donutSec.appendChild(createDonutChart(categories));
-  chartsRow.appendChild(donutSec);
+  const rankSec = document.createElement('div');
+  rankSec.className = 'result-section';
+  rankSec.innerHTML = '<h3 class="section-title">📊 分类偏好排行</h3>';
+  rankSec.appendChild(createCategoryRanking(categories));
+  chartsRow.appendChild(rankSec);
+  const scoreSec = document.createElement('div');
+  scoreSec.className = 'result-section';
+  scoreSec.innerHTML = '<h3 class="section-title">📈 评分总览</h3>';
+  scoreSec.appendChild(createScoreOverview(categories));
+  chartsRow.appendChild(scoreSec);
   resultPage.appendChild(chartsRow);
 
   resultPage.appendChild(createHighlights(categories));
