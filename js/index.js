@@ -329,6 +329,7 @@ function createProfileHeader(userName, categories, timestamp) {
   const topEmoji = top?.items[0]?.emoji || '🏆';
 
   header.innerHTML = `
+    <div class="result-header-sharer">👤 分享者</div>
     <div class="result-header-main">
       <div class="result-header-avatar">${userName[0]}</div>
       <div class="result-header-info">
