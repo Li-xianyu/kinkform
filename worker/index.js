@@ -80,6 +80,73 @@ export default {
       }
     }
 
+    // POST /api/result -> Save result data
+    if (url.pathname === "/api/result" && request.method === "POST") {
+      try {
+        const ip = request.headers.get("cf-connecting-ip") || "unknown";
+        const now = Date.now();
+        if (ip !== "unknown") {
+          if (ipCache.has(ip)) {
+            const lastTime = ipCache.get(ip);
+            if (now - lastTime < 60000) {
+              return new Response(JSON.stringify({ error: "请求过于频繁，请1分钟后再试" }), { status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+            }
+          }
+          ipCache.set(ip, now);
+        }
+
+        const reqJson = await request.json();
+        const { userName, categories } = reqJson;
+
+        if (!userName || !categories || !Array.isArray(categories) || categories.length === 0) {
+          return new Response(JSON.stringify({ error: "数据不完整" }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+        }
+
+        const payload = JSON.stringify({ userName, categories, timestamp: Date.now() });
+        if (payload.length > 50000) {
+          return new Response(JSON.stringify({ error: "数据过大" }), { status: 413, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+        }
+
+        const chars = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+        let key = '';
+        for (let i = 0; i < 6; i++) {
+          key += chars.charAt(Math.floor(Math.random() * chars.length));
+        }
+
+        await env.KINKFORM_KV.put(key, payload, { expirationTtl: 86400 });
+
+        return new Response(JSON.stringify({ key }), {
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      } catch (e) {
+        return new Response(JSON.stringify({ error: "无效的请求: " + e.message }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      }
+    }
+
+    // GET /api/result/:key -> Retrieve result data
+    if (url.pathname.startsWith("/api/result/") && request.method === "GET") {
+      const key = url.pathname.split("/").pop();
+      if (!key) {
+        return new Response("Missing key", { status: 400, headers: corsHeaders });
+      }
+
+      const data = await env.KINKFORM_KV.get(key);
+      if (data === null) {
+        return new Response("Not found", { status: 404, headers: corsHeaders });
+      }
+
+      try {
+        const parsed = JSON.parse(data);
+        if (parsed.userName && parsed.categories) {
+          return new Response(data, {
+            headers: { ...corsHeaders, "Content-Type": "application/json;charset=UTF-8" },
+          });
+        }
+      } catch (_) {}
+
+      return new Response("Not found", { status: 404, headers: corsHeaders });
+    }
+
     // GET /api/share/:key -> Retrieve
     if (url.pathname.startsWith("/api/share/") && request.method === "GET") {
       const key = url.pathname.split("/").pop();

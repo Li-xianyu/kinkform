@@ -427,6 +427,95 @@ function showResult() {
 	    }
 	  });
 	
+	  // 生成结果分享链接按钮
+	  const shareResultBtn = document.createElement('button');
+	  shareResultBtn.innerHTML = '🔗 生成分享链接';
+	  shareResultBtn.style.padding = '10px 20px';
+	  shareResultBtn.style.background = 'linear-gradient(135deg, #8a2be2, #4a0e4e)';
+	  shareResultBtn.style.color = 'white';
+	  shareResultBtn.style.border = 'none';
+	  shareResultBtn.style.borderRadius = '20px';
+	  shareResultBtn.style.cursor = 'pointer';
+
+	  shareResultBtn.addEventListener('click', async () => {
+	    try {
+	      const loading = document.createElement('div');
+	      loading.textContent = '正在生成分享链接...';
+	      loading.style.position = 'fixed';
+	      loading.style.top = '50%';
+	      loading.style.left = '50%';
+	      loading.style.transform = 'translate(-50%, -50%)';
+	      loading.style.background = 'rgba(0,0,0,0.7)';
+	      loading.style.color = 'white';
+	      loading.style.padding = '10px 20px';
+	      loading.style.borderRadius = '5px';
+	      loading.style.zIndex = '1000';
+	      document.body.appendChild(loading);
+
+	      const response = await fetch(`${API_BASE_URL}/api/result`, {
+	        method: 'POST',
+	        headers: { 'Content-Type': 'application/json' },
+	        body: JSON.stringify({ userName, categories: categories })
+	      });
+
+	      document.body.removeChild(loading);
+
+	      if (!response.ok) {
+	        const res = await response.json();
+	        throw new Error(res.error || '网络请求失败');
+	      }
+
+	      const data = await response.json();
+	      const shareUrl = `${window.location.origin}${window.location.pathname}?result=${data.key}`;
+
+	      if (navigator.clipboard && window.isSecureContext) {
+	        navigator.clipboard.writeText(shareUrl);
+	      }
+
+	      const linkContainer = document.createElement('div');
+	      linkContainer.style.margin = '10px 0';
+	      linkContainer.style.padding = '10px';
+	      linkContainer.style.background = '#f0e6ff';
+	      linkContainer.style.border = '1px dashed #8a2be2';
+	      linkContainer.style.borderRadius = '12px';
+	      linkContainer.style.textAlign = 'center';
+
+	      const linkLabel = document.createElement('div');
+	      linkLabel.textContent = '✅ 分享链接已生成（已复制）';
+	      linkLabel.style.fontSize = '12px';
+	      linkLabel.style.color = '#4a0e4e';
+	      linkLabel.style.marginBottom = '6px';
+	      linkContainer.appendChild(linkLabel);
+
+	      const linkInput = document.createElement('input');
+	      linkInput.type = 'text';
+	      linkInput.value = shareUrl;
+	      linkInput.readOnly = true;
+	      linkInput.style.width = '100%';
+	      linkInput.style.padding = '8px';
+	      linkInput.style.border = '1px solid #8a2be2';
+	      linkInput.style.borderRadius = '8px';
+	      linkInput.style.fontSize = '13px';
+	      linkInput.style.color = '#4a0e4e';
+	      linkInput.style.background = 'white';
+	      linkInput.style.boxSizing = 'border-box';
+	      linkInput.onclick = () => {
+	        linkInput.select();
+	        if (navigator.clipboard && window.isSecureContext) {
+	          navigator.clipboard.writeText(shareUrl);
+	        }
+	      };
+	      linkContainer.appendChild(linkInput);
+
+	      shareResultBtn.insertAdjacentElement('afterend', linkContainer);
+	    } catch (error) {
+	      console.error('生成分享链接失败:', error);
+	      alert('失败: ' + error.message);
+	    }
+	  });
+
+	  shareContainer.appendChild(shareResultBtn);
+
 	  // 其他原有代码...
 	  shareContainer.appendChild(shareBtn);
 	  resultPage.appendChild(shareContainer);
@@ -708,10 +797,93 @@ async function fetchWithTimeout(url, timeoutMs = 10000) {
   }
 }
 
+function renderResultData(data) {
+  const app = document.getElementById('app');
+  const homePage = document.getElementById('home-page');
+  homePage.style.display = 'none';
+  app.style.display = 'block';
+
+  const resultPage = document.querySelector('#result-page');
+  const mainPage = document.querySelector('#main-page');
+  mainPage.style.display = 'none';
+  resultPage.style.display = 'block';
+
+  const rateLabels = ['不接受 🈲', '无所谓 😐', '一般 🙂', '喜欢 😍', '超爱 🥰'];
+
+  resultPage.innerHTML = `
+    <div class="user-header">
+      <h2>${data.userName}的偏好自测</h2>
+    </div>
+  `;
+
+  const homeBtn = document.createElement('button');
+  homeBtn.textContent = '← 返回首页';
+  homeBtn.style.margin = '10px';
+  homeBtn.style.padding = '10px 12px';
+  homeBtn.style.borderRadius = '8px';
+  homeBtn.style.cursor = 'pointer';
+  homeBtn.style.border = 'none';
+  homeBtn.style.backgroundColor = '#f8c8d0';
+  homeBtn.style.fontWeight = 'bold';
+
+  homeBtn.onclick = () => {
+    app.style.display = 'none';
+    homePage.style.display = 'block';
+    window.history.replaceState({}, document.title, window.location.pathname);
+  };
+
+  resultPage.appendChild(homeBtn);
+
+  data.categories.forEach((category) => {
+    const title = document.createElement('h3');
+    title.textContent = `【${category.name}】`;
+    title.style.color = '#5a2a41';
+    resultPage.appendChild(title);
+
+    category.items.forEach((item) => {
+      const rate = item.rate || 0;
+      const line = document.createElement('p');
+      line.textContent = `${item.emoji ? item.emoji + ' ' : ''}${item.label}：${rateLabels[rate]}`;
+      line.style.margin = '6px 0';
+      resultPage.appendChild(line);
+    });
+  });
+}
+
 async function checkUrlParams() {
   const urlParams = new URLSearchParams(window.location.search);
   const key = urlParams.get('key');
-  
+  const resultKey = urlParams.get('result');
+
+  if (resultKey) {
+    document.getElementById('loading-overlay').classList.add('active');
+    document.getElementById('loading-text').textContent = '正在载入分享结果...';
+
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/result/${resultKey}`);
+      if (!response.ok) {
+        if (response.status === 404) {
+          alert('该分享结果已失效或不存在。');
+        } else {
+          alert('加载失败，请稍后重试。');
+        }
+        document.getElementById('loading-overlay').classList.remove('active');
+        window.history.replaceState({}, document.title, window.location.pathname);
+        return;
+      }
+      const data = await response.json();
+      document.getElementById('loading-overlay').classList.remove('active');
+      window.history.replaceState({}, document.title, window.location.pathname);
+      renderResultData(data);
+    } catch (error) {
+      console.error('加载分享结果失败:', error);
+      alert('网络错误，无法加载分享结果。');
+      document.getElementById('loading-overlay').classList.remove('active');
+      window.history.replaceState({}, document.title, window.location.pathname);
+    }
+    return;
+  }
+
   if (key) {
     document.getElementById('loading-overlay').classList.add('active');
     document.getElementById('loading-text').textContent = '正在载入分享的自测表...';

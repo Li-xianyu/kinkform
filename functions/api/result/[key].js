@@ -1,0 +1,39 @@
+export async function onRequestGet(context) {
+  const { env, params } = context;
+  const key = params.key;
+
+  const corsHeaders = {
+    "Access-Control-Allow-Origin": "*",
+    "Access-Control-Allow-Methods": "GET, OPTIONS",
+    "Access-Control-Max-Age": "86400",
+    "Access-Control-Allow-Headers": "Content-Type",
+  };
+
+  if (!key) {
+    return new Response("Missing key", { status: 400, headers: corsHeaders });
+  }
+
+  if (!env.KINKFORM_KV) {
+    return new Response("KV not bound", { status: 500, headers: corsHeaders });
+  }
+
+  const data = await env.KINKFORM_KV.get(key);
+  if (data === null) {
+    return new Response("Not found", { status: 404, headers: corsHeaders });
+  }
+
+  return new Response(data, {
+    headers: { ...corsHeaders, "Content-Type": "application/json;charset=UTF-8" },
+  });
+}
+
+export async function onRequestOptions() {
+  return new Response(null, {
+    headers: {
+      "Access-Control-Allow-Origin": "*",
+      "Access-Control-Allow-Methods": "GET, OPTIONS",
+      "Access-Control-Max-Age": "86400",
+      "Access-Control-Allow-Headers": "Content-Type",
+    },
+  });
+}
