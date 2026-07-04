@@ -13,8 +13,16 @@ export async function onRequestGet(context) {
     return new Response("Missing key", { status: 400, headers: corsHeaders });
   }
 
+  if (!env) {
+    return new Response("Context env is undefined", { status: 500, headers: corsHeaders });
+  }
+
   if (!env.KINKFORM_KV) {
-    return new Response("KV namespace KINKFORM_KV not bound", { status: 500, headers: corsHeaders });
+    const envKeys = [];
+    for (const key in env) {
+      envKeys.push(key);
+    }
+    return new Response(`KV namespace KINKFORM_KV not bound. Available env keys: ${JSON.stringify(envKeys)}. Properties: ${Object.getOwnPropertyNames(env).join(', ')}`, { status: 500, headers: corsHeaders });
   }
 
   // 从 KV 获取自测表数据
