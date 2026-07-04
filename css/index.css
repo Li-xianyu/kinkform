@@ -16,24 +16,6 @@
 	--rate-4: #d7265d;
 
 	--btn-color: #f8c8d0;
-* {
-  -webkit-tap-highlight-color: transparent;
-  tap-highlight-color: transparent;
-  outline: none;
-}
-
-
-:root {
-	--bg-color: #fff5f7;
-	--text-color: #5a2a41;
-
-	--rate-0: #f3e6e8;
-	--rate-1: #f8c8d0;
-	--rate-2: #f58cab;
-	--rate-3: #ec4d7a;
-	--rate-4: #d7265d;
-
-	--btn-color: #f8c8d0;
 	--btn-hover: #ec4d7a;
 
 	--radius: 12px;

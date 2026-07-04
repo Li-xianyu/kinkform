@@ -720,7 +720,7 @@ async function checkUrlParams() {
         if (attempt === 2) {
           document.getElementById('loading-text').textContent = '正在重试...';
         }
-        const response = await fetchWithTimeout(`${API_BASE_URL}/api/share/${key}`, 10000);
+        const response = await fetchWithTimeout(`${API_BASE_URL}/api/share/${key}`, 12000);
         if (response.ok) {
           const text = await response.text();
           currentText = text;
@@ -752,12 +752,26 @@ async function checkUrlParams() {
       console.error('加载分享配置失败:', lastError);
       const isTimeout = lastError.message === '请求超时';
       const isOffline = !navigator.onLine;
+      
+      // 检测微信或QQ内置浏览器
+      const ua = navigator.userAgent.toLowerCase();
+      const isWeChat = ua.indexOf('micromessenger') !== -1;
+      const isQQ = ua.indexOf('mqqbrowser') !== -1 || ua.indexOf('qq/') !== -1;
+
       if (isOffline) {
         alert('网络连接不可用，请检查网络后刷新重试。');
       } else if (isTimeout) {
-        alert('请求超时，服务器响应较慢，请稍后刷新重试。');
+        if (isWeChat || isQQ) {
+          alert('提示：QQ/微信内置浏览器因 workers.dev 域名被国内屏蔽，可能无法直接加载。\n\n请点击右上角三个点，选择「在浏览器中打开」即可秒进！');
+        } else {
+          alert('请求超时，服务器响应较慢（workers.dev 域名在国内偶尔访问受限），请稍后刷新或尝试更换网络。');
+        }
       } else {
-        alert('网络错误，无法加载分享的自测表，请稍后刷新重试。');
+        if (isWeChat || isQQ) {
+          alert('加载失败。建议点击右上角三个点，选择「在浏览器中打开」重试。');
+        } else {
+          alert('网络错误，无法加载分享的自测表，请稍后刷新重试。');
+        }
       }
     }
 
