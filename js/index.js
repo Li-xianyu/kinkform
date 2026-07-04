@@ -692,6 +692,19 @@ window.extendShare = async (index) => {
   }
 };
 
+async function fetchWithTimeout(url, timeoutMs = 10000) {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    const response = await fetch(url, { signal: controller.signal });
+    clearTimeout(timer);
+    return response;
+  } catch (err) {
+    clearTimeout(timer);
+    throw err;
+  }
+}
+
 async function checkUrlParams() {
   const urlParams = new URLSearchParams(window.location.search);
   const key = urlParams.get('key');
@@ -700,23 +713,56 @@ async function checkUrlParams() {
     document.getElementById('loading-overlay').classList.add('active');
     document.getElementById('loading-text').textContent = '正在载入分享的自测表...';
     
-    try {
-      const response = await fetch(`${API_BASE_URL}/api/share/${key}`);
-      if (response.ok) {
-        const text = await response.text();
-        currentText = text;
-        start(); // 直接进入测评流程
-      } else {
-        alert('加载分享的自测表失败：可能是链接已失效或密钥错误。');
+    let lastError = null;
+    // 最多尝试 2 次（首次 + 1 次重试）
+    for (let attempt = 1; attempt <= 2; attempt++) {
+      try {
+        if (attempt === 2) {
+          document.getElementById('loading-text').textContent = '正在重试...';
+        }
+        const response = await fetchWithTimeout(`${API_BASE_URL}/api/share/${key}`, 10000);
+        if (response.ok) {
+          const text = await response.text();
+          currentText = text;
+          document.getElementById('loading-overlay').classList.remove('active');
+          window.history.replaceState({}, document.title, window.location.pathname);
+          start();
+          return; // 成功，直接返回
+        } else if (response.status === 404) {
+          // 链接已失效，无需重试
+          alert('加载失败：该分享链接已失效或密钥错误（可能已过期）。');
+          break;
+        } else {
+          lastError = new Error(`服务器返回 ${response.status}`);
+        }
+      } catch (error) {
+        lastError = error;
+        if (error.name === 'AbortError') {
+          lastError = new Error('请求超时');
+        }
+        // 如果还有重试机会，稍等再试
+        if (attempt < 2) {
+          await new Promise(r => setTimeout(r, 1500));
+        }
       }
-    } catch (error) {
-      console.error('加载分享配置失败:', error);
-      alert('网络错误，无法加载分享的自测表。');
-    } finally {
-      document.getElementById('loading-overlay').classList.remove('active');
-      // 移除 URL 中的 key 参数避免刷新重复加载
-      window.history.replaceState({}, document.title, window.location.pathname);
     }
+
+    // 所有尝试均失败
+    if (lastError) {
+      console.error('加载分享配置失败:', lastError);
+      const isTimeout = lastError.message === '请求超时';
+      const isOffline = !navigator.onLine;
+      if (isOffline) {
+        alert('网络连接不可用，请检查网络后刷新重试。');
+      } else if (isTimeout) {
+        alert('请求超时，服务器响应较慢，请稍后刷新重试。');
+      } else {
+        alert('网络错误，无法加载分享的自测表，请稍后刷新重试。');
+      }
+    }
+
+    document.getElementById('loading-overlay').classList.remove('active');
+    window.history.replaceState({}, document.title, window.location.pathname);
   }
 }
 
