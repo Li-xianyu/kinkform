@@ -1,4 +1,4 @@
-// Trigger deploy: force Cloudflare Pages to reload KV bindings
+// Trigger deploy 2: KV bindings configured for both production and preview
 let inputText = `
 #训练方式偏好
 -自由重量训练 | 🏋️‍♂️
